@@ -1,0 +1,277 @@
+# NPE → SPE Mapping Rules
+# Translates Narrative Physics Engine state into Semantic Physics Engine constraints
+#
+# Usage: These mappings can be applied by discourse_mapper.py or manually by agents
+# to select appropriate SPE constraints based on NPE narrative state.
+#
+# Created: 2026-01-24
+
+---
+
+# Tension Level → Entropy Profile
+# NPE tension values (0.0 - 1.0) map to SPE entropy profiles
+tension_to_entropy_profile:
+  - range: [0.0, 0.3]
+    profile: deep_pov_reflection
+    description: "Low stakes, reflective moments"
+    characteristics:
+      sentence_variance: Medium
+      cliche_tolerance: 0.0
+      recommended_lenses: [acoustics, tactile_micro]
+
+  - range: [0.3, 0.6]
+    profile: breezy_dialogue
+    description: "Building tension, banter, normal interaction"
+    characteristics:
+      sentence_variance: Low
+      cliche_tolerance: 0.3
+      recommended_lenses: [acoustics]
+
+  - range: [0.6, 1.0]
+    profile: high_entropy_action
+    description: "High stakes, action, crisis moments"
+    characteristics:
+      sentence_variance: High
+      cliche_tolerance: 0.0
+      recommended_lenses: [somatics, thermodynamics]
+      banned_words: [suddenly, then, next]
+
+---
+
+# Character MCS → SPE Archetype
+# NPE's Motivation-Conflict-Stakes patterns map to SPE character archetypes
+mcs_to_archetype:
+  # Pattern-based mappings (check in order)
+  - pattern:
+      wound: high      # 0.7+
+      truth: low       # 0.3-
+    archetype: naive_newcomer
+    base_modifier: 1.8
+    rationale: "Inexperience manifests as conventional thinking/speaking"
+
+  - pattern:
+      wound: low       # 0.3-
+      truth: high      # 0.7+
+    archetype: mentor
+    base_modifier: 0.8
+    rationale: "Wisdom should sound earned and specific"
+
+  - pattern:
+      role: antagonist
+    archetype: villain
+    base_modifier: 1.5
+    rationale: "Theatrical villainy permits stylized clichés"
+
+  - pattern:
+      role: comic_relief
+    archetype: comic_sidekick
+    base_modifier: 2.5
+    rationale: "Their voice IS linguistic inertia"
+
+  - pattern:
+      role: authority
+    archetype: authority_figure
+    base_modifier: 1.2
+    rationale: "Professional language is inherently formulaic"
+
+  # Default mappings (if no pattern matches)
+  - pattern:
+      role: protagonist
+    archetype: protagonist
+    base_modifier: 1.0
+    rationale: "Standard tolerance - thoughts should feel original"
+
+  - pattern:
+      role: love_interest
+    archetype: love_interest
+    base_modifier: 1.0
+    rationale: "Matches protagonist for balanced POV"
+
+  - pattern:
+      role: minor
+    archetype: minor_character
+    base_modifier: 1.5
+    rationale: "Economy of characterization"
+
+---
+
+# NPE Dimension Values → SPE Stress State
+# Emotional state from NPE drives stress modifier selection
+dimension_to_stress:
+  # Check conditions in order (first match wins)
+  - condition:
+      dimension: stakes
+      operator: ">"
+      threshold: 0.8
+    stress: panicked
+    modifier: 2.0
+    rationale: "Extreme stakes trigger survival-mode language"
+
+  - condition:
+      dimension: vulnerability
+      operator: ">"
+      threshold: 0.7
+    stress: vulnerable
+    modifier: 1.3
+    rationale: "Emotional exposure allows some familiar phrasing"
+
+  - condition:
+      dimension: trust
+      operator: "<"
+      threshold: -0.5
+    stress: stressed
+    modifier: 1.5
+    rationale: "Betrayed trust creates verbal guardedness"
+
+  - condition:
+      dimension: romantic_tension
+      operator: ">"
+      threshold: 0.8
+    stress: aroused
+    modifier: 1.2
+    rationale: "High arousal allows some sensory clichés in dialogue"
+
+  - condition:
+      dimension: stability_index
+      operator: ">"
+      threshold: 0.7
+    stress: calm
+    modifier: 1.0
+    rationale: "Stable scenes use standard tolerance"
+
+  # Default
+  - condition:
+      default: true
+    stress: calm
+    modifier: 1.0
+
+---
+
+# NPE Scene Type → SPE Sensory Lenses
+# Scene classification determines lens selection
+scene_type_to_lenses:
+  action_sequence:
+    primary: somatics
+    secondary: thermodynamics
+    notes: "Internal bodily sensation + heat/energy transfer"
+    banned_words: [suddenly, then, next, quickly]
+
+  intimate_moment:
+    primary: tactile_intimacy
+    secondary: proprioception_grounded
+    notes: "Living warmth vs dead objects + body position/weight"
+    banned_words: [electricity, spark, shiver, tingle, coil]
+
+  dialogue_heavy:
+    primary: acoustics
+    secondary: null
+    notes: "Voice quality, silence, room acoustics"
+
+  world_building:
+    primary: specific_grounding
+    secondary: tactile_micro
+    notes: "Brand names, cultural references + small object textures"
+
+  reflection:
+    primary: acoustics
+    secondary: somatics
+    notes: "Sound of silence + internal state"
+
+  chase_or_pursuit:
+    primary: proprioception_grounded
+    secondary: thermodynamics
+    notes: "Weight, gravity, resistance + exertion heat"
+
+  mystery_reveal:
+    primary: acoustics
+    secondary: somatics
+    notes: "Dramatic silence + gut reaction to truth"
+
+  romantic_tension:
+    primary: tactile_intimacy
+    secondary: acoustics
+    notes: "Touch contrast + voice/breath sounds"
+
+  grief_or_loss:
+    primary: somatics
+    secondary: acoustics
+    notes: "Physical weight of grief + surrounding silence"
+
+  celebration:
+    primary: acoustics
+    secondary: specific_grounding
+    notes: "Sounds of joy + concrete celebratory details"
+
+---
+
+# Context Modifiers (from SPE character_entropy_budgets.yaml)
+# These apply on top of archetype and stress modifiers
+context_modifiers:
+  dialogue:
+    modifier: 1.3
+    description: "Spoken words naturally include more prefab language"
+
+  internal_monologue:
+    modifier: 0.8
+    description: "Thoughts should be more specific than speech"
+
+  action_sequence:
+    modifier: 0.7
+    description: "High-stakes moments demand fresh, specific language"
+
+  romantic_beat:
+    modifier: 0.9
+    description: "Emotional intimacy requires specificity to feel earned"
+
+  exposition:
+    modifier: 1.2
+    description: "Informational passages can use some conventional framing"
+
+---
+
+# Voice Mechanics Activation
+# Gender-specific voice profiles based on POV character
+voice_mechanics:
+  female:
+    profile: female_voice_mechanics.md
+    primary_sense: [proprioceptive, tactile]
+    interiority: associative
+    desire_type: responsive
+    pacing: cyclic
+    lens_bias: [tactile_intimacy, somatics, proprioception_grounded]
+
+  male:
+    profile: male_voice_mechanics.md
+    primary_sense: [visual, proprioceptive]
+    interiority: direct
+    desire_type: spontaneous
+    pacing: linear
+    lens_bias: [visual_action, thermodynamics, somatics]
+
+---
+
+# Effective Tolerance Calculation
+# Formula: profile.tolerance × archetype.modifier × stress.modifier × context.modifier
+#
+# Example:
+#   Profile: breezy_dialogue (0.3)
+#   Archetype: comic_sidekick (2.5)
+#   Stress: calm (1.0)
+#   Context: dialogue (1.3)
+#
+#   Effective = 0.3 × 2.5 × 1.0 × 1.3 = 0.975
+#
+# Capped by voice_rigidity ceiling from character_entropy_budgets.yaml:
+#   high rigidity: max 0.5
+#   medium rigidity: max 0.75
+#   low rigidity: no cap
+
+tolerance_formula:
+  base: "entropy_profile.cliche_tolerance"
+  multipliers:
+    - "character_archetype.base_modifier"
+    - "stress_state.modifier"
+    - "context.modifier"
+  ceiling: "voice_rigidity.tolerance_ceiling"
+  minimum: 0.0
+  maximum: 1.0

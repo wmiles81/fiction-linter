@@ -1,0 +1,33 @@
+# Entropy Profiles - Narrative Heat Maps
+# This file defines the "Temperature" settings for different scene types.
+#
+# CHARACTER-AWARE TOLERANCE:
+# These base tolerances can be modified by character archetypes.
+# See character_entropy_budgets.yaml for character-specific modifiers.
+#
+# Formula:
+#   effective_tolerance = profile.cliche_tolerance × character.modifier × stress.modifier × context.modifier
+#
+# Example:
+#   breezy_dialogue (0.3) × comic_sidekick (2.5) × calm (1.0) × dialogue (1.3) = 0.975 effective tolerance
+#   high_entropy_action (0.0) × protagonist (1.0) × panicked (2.0) × action (0.7) = 0.0 (strict stays strict)
+
+profiles:
+  high_entropy_action:
+    description: "Maximum chaos. Disrupted syntax. High sensory overload."
+    sentence_length_variance: "High (Mix of 1-word sentences and run-ons)"
+    cliche_tolerance: "Strict (0.0)"
+    required_lenses: ["somatics", "thermodynamics"]
+    banned_words: ["suddenly", "then", "next"]
+
+  deep_pov_reflection:
+    description: "Internal monologue. Slow time. High metaphor density."
+    sentence_length_variance: "Medium"
+    cliche_tolerance: "Strict (0.0)"
+    required_lenses: ["acoustics", "tactile_micro"]
+    
+  breezy_dialogue:
+    description: "Fast-paced banter. Lower density."
+    sentence_length_variance: "Low"
+    cliche_tolerance: "Moderate (0.3)"
+    required_lenses: ["acoustics"]

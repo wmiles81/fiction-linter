@@ -1,0 +1,62 @@
+# Sensory Lenses - Oblique Narrative Filters
+# This file defines the specific "Camera Filters" the AI must use to generate description.
+
+lenses:
+  acoustics:
+    description: "Focus 80% of descriptive bandwidth on sound."
+    triggers:
+      - "Describe the silence."
+      - "What captures the ambient noise?"
+      - "How does the voice interact with the room acoustics?"
+    vocabulary_bias: [hum, thrum, scrape, echo, deaden, reverberate, silence, dissonance]
+
+  thermodynamics:
+    description: "Focus on heat transfer and entropy."
+    triggers:
+      - "Who is losing heat?"
+      - "Is the air stagnant or moving?"
+      - "Describe the texture of the temperature."
+    vocabulary_bias: [stifling, frigid, radiate, leech, clammy, feverish, conduction, sweat, ice]
+
+  somatics:
+    description: "Focus on internal bodily sensation (Interoception), but stay biological, not metaphorical."
+    triggers:
+      - "Where is the tension held?"
+      - "What does the stomach feel like?"
+      - "Describe the mechanics of the breath."
+    vocabulary_bias: [gut, constriction, nausea, heavy, diaphragm, ribcage, sternum]
+
+  proprioception_grounded:
+    description: "Focus on weight, gravity, and resistance. How the body interacts with space and surfaces."
+    triggers:
+      - "Where is the weight resting?"
+      - "What is pushing back against the skin?"
+    vocabulary_bias: [heavy, anchored, drag, friction, resistance, floor, gravity, solid, bone]
+
+  tactile_micro:
+    description: "Focus on the texture of small objects. Ensure actions are logical (feel texture, don't 'see' with fingers)."
+    triggers:
+      - "What do the hands feel?"
+      - "Describe the surface of the nearest prop."
+    vocabulary_bias: [rough, smooth, sticky, grit, plastic, metal, wood, snag, weave]
+
+  tactile_intimacy:
+    description: "Focus on the contrast between hard, dead objects (efficiency) and soft, living things (affection)."
+    triggers:
+      - "What is the difference between the object and the person?"
+      - "Where is the warmth in the room?"
+    vocabulary_bias: [soft, messy, warm, sticky, breath, pulse, tangled, rigid, plastic]
+
+  specific_grounding:
+    description: "Replace generic nouns with specific brands, foods, or cultural references. Ground the scene in modern reality (RomCom style)."
+    triggers:
+      - "What brand is the object?"
+      - "What specific smell is that?"
+    vocabulary_bias: [Target, Starbucks, velcro, glitter, Cheerios, crumbs, sticky, yoga pants, Costco]
+
+  somatic_conceptual_fusion:
+    description: "Strictly for DIALOGUE ONLY. Juxtapose a concrete, sensory reality with an abstract existential dread or emotion. DO NOT use in narration."
+    triggers:
+      - "What does the room smell like emotionally?"
+      - "Combine a mundane object with a high-stakes feeling."
+    vocabulary_bias: [bleach, dread, existential, plastic, despair, cardboard, regret, neon, loneliness]

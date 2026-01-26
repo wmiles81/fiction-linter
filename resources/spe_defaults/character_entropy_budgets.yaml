@@ -1,0 +1,134 @@
+# Character Entropy Budgets
+# Defines cliché tolerance modifiers per character archetype
+#
+# This file operationalizes the SFE concept that different characters
+# should have different tolerance levels based on their role and voice.
+#
+# Usage Formula:
+#   effective_tolerance = scene_profile.cliche_tolerance × character.base_tolerance_modifier × stress_modifier
+#
+# Example:
+#   breezy_dialogue (0.3) × comic_sidekick (2.5) × calm (1.0) = 0.75 effective tolerance
+#   high_entropy_action (0.0) × protagonist (1.0) × panicked (2.0) = 0.0 (strict stays strict)
+
+character_archetypes:
+
+  protagonist:
+    base_tolerance_modifier: 1.0
+    description: "Standard tolerance - internal thoughts should feel original and specific"
+    stress_modifiers:
+      calm: 1.0
+      stressed: 1.5
+      panicked: 2.0
+    notes: "Even under stress, protagonist prose should aim for specificity"
+
+  love_interest:
+    base_tolerance_modifier: 1.0
+    description: "Standard tolerance - matches protagonist for balanced POV chapters"
+    stress_modifiers:
+      calm: 1.0
+      stressed: 1.5
+      panicked: 2.0
+      vulnerable: 1.3
+    notes: "Vulnerability state allows slightly more familiar phrasing for emotional accessibility"
+
+  comic_sidekick:
+    base_tolerance_modifier: 2.5
+    description: "High tolerance - their voice IS linguistic inertia; clichés are characterization"
+    stress_modifiers:
+      calm: 1.0
+      stressed: 1.2
+      panicked: 1.5
+    notes: "Prefab language is part of their charm; let them speak in familiar patterns"
+
+  naive_newcomer:
+    base_tolerance_modifier: 1.8
+    description: "Elevated tolerance - inexperience manifests as conventional thinking/speaking"
+    stress_modifiers:
+      calm: 1.0
+      stressed: 1.3
+      panicked: 1.8
+    notes: "Their journey is from cliché to specificity as they grow"
+
+  villain:
+    base_tolerance_modifier: 1.5
+    description: "Stylized tolerance - theatrical villainy can use familiar dramatic beats"
+    stress_modifiers:
+      calm: 1.0
+      confident: 0.8
+      monologuing: 2.0
+      defeated: 1.5
+    notes: "Monologuing state permits dramatic clichés; confident state demands precision"
+
+  mentor:
+    base_tolerance_modifier: 0.8
+    description: "Lower tolerance - wisdom should sound earned and specific, not fortune-cookie"
+    stress_modifiers:
+      calm: 1.0
+      teaching: 0.7
+      stressed: 1.2
+    notes: "Teaching moments require the highest specificity"
+
+  authority_figure:
+    base_tolerance_modifier: 1.2
+    description: "Slightly elevated - professional/institutional language is inherently formulaic"
+    stress_modifiers:
+      calm: 1.0
+      official: 1.5
+      off_duty: 0.9
+    notes: "Official capacity allows bureaucratic phrasing; off-duty requires more personality"
+
+  minor_character:
+    base_tolerance_modifier: 1.5
+    description: "Elevated tolerance - brief appearances don't require deep voice investment"
+    stress_modifiers:
+      calm: 1.0
+      stressed: 1.3
+    notes: "Economy of characterization; let them serve their function without over-engineering"
+
+# Voice Rigidity Levels
+# Used in conjunction with entropy profiles to determine how much a character's
+# voice can flex vs. must remain consistent
+voice_rigidity:
+
+  high:
+    description: "Character has a strongly defined voice that must be preserved"
+    tolerance_ceiling: 0.5
+    examples: ["protagonist", "love_interest", "mentor"]
+    notes: "Even with modifiers, never exceed 0.5 effective tolerance"
+
+  medium:
+    description: "Character voice is defined but can flex for dramatic moments"
+    tolerance_ceiling: 0.75
+    examples: ["villain", "authority_figure", "naive_newcomer"]
+    notes: "Ceiling allows more range while maintaining recognizability"
+
+  low:
+    description: "Character voice is loose, defined more by role than specific patterns"
+    tolerance_ceiling: 1.0
+    examples: ["comic_sidekick", "minor_character"]
+    notes: "No ceiling - let the scene profile and stress state drive tolerance"
+
+# Context Modifiers
+# Additional situational adjustments beyond character archetype
+context_modifiers:
+
+  dialogue:
+    modifier: 1.3
+    description: "Spoken words naturally include more prefab language than internal prose"
+
+  internal_monologue:
+    modifier: 0.8
+    description: "Thoughts should be more specific than speech"
+
+  action_sequence:
+    modifier: 0.7
+    description: "High-stakes moments demand fresh, specific language"
+
+  romantic_beat:
+    modifier: 0.9
+    description: "Emotional intimacy requires specificity to feel earned"
+
+  exposition:
+    modifier: 1.2
+    description: "Informational passages can use some conventional framing"

@@ -1,0 +1,333 @@
+# Cliche Collider - Semantic Ban List
+# This file defines the "Illegal Semantic Moves" that trigger a validation failure.
+
+somatic_cliches:
+  - phrase: "shiver down his spine"
+    penalty_score: 1.0
+    suggested_fix: "Describe a specific thermal or tactile sensation on the skin."
+  - phrase: "shiver down her spine"
+    penalty_score: 1.0
+  - phrase: "released a breath"
+    context: "didn't know he/she was holding"
+    penalty_score: 0.9
+  - phrase: "let out a breath"
+    context: "didn't know he/she was holding"
+    penalty_score: 0.9
+  - phrase: "cost more than"
+    penalty_score: 0.9
+    suggested_fix: "Describe the specific material quality, brand value, or sensory detail of luxury instead of a price comparison."
+  - phrase: "heart skipped a beat"
+    penalty_score: 0.8
+  - phrase: "heart skipped a beat"
+    penalty_score: 0.8
+    suggested_fix: "Describe the sudden suspension of breath, the physical jolt of surprise, or the momentary stillness of intense attraction."
+  - phrase: "furrowed brows"
+    penalty_score: 0.5
+    suggested_fix: "Focus on the eyes or the tension in the forehead."
+  - phrase: "breath hitched"
+    penalty_score: 0.7
+  - phrase: "butterflies in stomach"
+    penalty_score: 0.8
+  - phrase: "turned to jelly"
+    penalty_score: 0.8
+  - phrase: "weak in the knees"
+    penalty_score: 0.8
+  - phrase: "reach his eyes"
+    context: "smile description"
+    penalty_score: 0.9
+    suggested_fix: "Describe the specific micro-movement of the orbicularis oculi or the stillness of the face."
+  - phrase: "reach her eyes"
+    context: "smile description"
+    penalty_score: 0.9
+
+overused_adjectives_adverbs:
+  - phrase: "practiced precision"
+    penalty_score: 0.7
+    suggested_fix: "Rehearsed / Familiar / Describe the action directly."
+  - phrase: "practiced grace"
+    penalty_score: 0.7
+  - phrase: "practiced agility"
+    penalty_score: 0.7
+  - phrase: "practiced control"
+    penalty_score: 0.7
+  - phrase: "practiced ease"
+    penalty_score: 0.7
+  - phrase: "practiced smile"
+    penalty_score: 0.7
+    suggested_fix: "Hollow smile / Professional smile / Show warmth absence."
+
+syntax_fragments:
+  - phrase: ". Together."
+    penalty_score: 1.0
+    suggested_fix: "Incorporate into previous sentence or expand."
+  - phrase: ", Together."
+    penalty_score: 1.0
+  - phrase: "Together."
+    context: "Dialogue standalone"
+    penalty_score: 1.0
+
+weak_descriptors:
+  - phrase: "very"
+    penalty_score: 0.4
+    suggested_fix: "Delete or use a stronger word."
+  - phrase: "really"
+    penalty_score: 0.4
+  - phrase: "just"
+    penalty_score: 0.3
+  - phrase: "quite"
+    penalty_score: 0.3
+  - phrase: "rather"
+    penalty_score: 0.3
+
+emotion_tells:
+  - phrase: "felt"
+    penalty_score: 0.5
+    suggested_fix: "Show the emotion instead."
+  - phrase: "realized"
+    penalty_score: 0.5
+  - phrase: "knew"
+    penalty_score: 0.5
+  - phrase: "thought"
+    penalty_score: 0.5
+  - phrase: "hate that"
+    context: "I hate that I [feel/care/notice] - reflexive telling"
+    penalty_score: 0.9
+    suggested_fix: "Show the conflicting emotion through physical resistance or involuntary reaction."
+  - phrase: "hated that"
+    context: "reflexive telling"
+    penalty_score: 0.9
+
+purple_prose:
+  - phrase: "orbs"
+    context: "referring to eyes"
+    penalty_score: 1.0
+  - phrase: "digits"
+    context: "referring to fingers"
+    penalty_score: 0.8
+  - phrase: "tresses"
+    penalty_score: 0.8
+  - phrase: "member"
+    penalty_score: 0.9
+  - phrase: "manhood"
+    penalty_score: 0.9
+
+genre_cliches:
+  - phrase: "ozone"
+    context: "smell of magic"
+    penalty_score: 0.7
+    suggested_fix: "Describe specific scent (copper, burning hair, static)."
+
+dialogue_crutches:
+  - phrase: "chuckled"
+    penalty_score: 0.3
+    suggested_fix: "Use a specific sound (snorted, wheezed, barked) or an action."
+  - phrase: "smirked"
+    penalty_score: 0.4
+    suggested_fix: "Describe the specific curve of the mouth or the eyes."
+  - phrase: "rolled his eyes"
+    penalty_score: 0.4
+  - phrase: "rolled her eyes"
+    penalty_score: 0.4
+
+structural_tells:
+  - pattern: "Start with weather -> Introduction -> Dialogue -> Summary"
+    description: "The 'Standard Opening' Protocol"
+    penalty_score: 0.6
+
+ai_structural_patterns:
+  description: "Telltale AI writing patterns - high priority for removal"
+  patterns:
+    - phrase: "out of spite"
+      context: "applied to inanimate objects (boats, cars, etc)"
+      penalty_score: 0.9
+      suggested_fix: "Describe physical stress or mechanical failure. Objects don't feel spite."
+    - phrase: "While X is true, it is also important to note Y"
+      penalty_score: 1.0
+      suggested_fix: "Remove equivocation. Commit to a statement."
+    - phrase: "It's worth noting that"
+      penalty_score: 0.8
+      suggested_fix: "Just state the thing directly."
+    - phrase: "In many ways"
+      penalty_score: 0.7
+      suggested_fix: "Be specific about which ways."
+    - phrase: "It was almost as if"
+      penalty_score: 0.7
+      suggested_fix: "Use a direct metaphor or simile."
+    - phrase: "There was something about"
+      penalty_score: 0.8
+      suggested_fix: "Identify what the something is."
+    - phrase: "but something"
+      context: "followed by adjective"
+      penalty_score: 0.9
+      suggested_fix: "Name the object/scent/feeling directly. No vague 'somethings'."
+    - phrase: "The weight of"
+      context: "followed by abstract concept"
+      penalty_score: 0.7
+      suggested_fix: "Show the physical manifestation of the abstract."
+    - phrase: "A [emotion] settled over"
+      penalty_score: 0.8
+      suggested_fix: "Show the emotion through action or sensation."
+    - phrase: "couldn't help but"
+      penalty_score: 0.6
+      suggested_fix: "Just have them do the thing."
+    - phrase: "found himself"
+      penalty_score: 0.6
+      suggested_fix: "He did the thing. No 'finding' needed."
+    - phrase: "found herself"
+      penalty_score: 0.6
+      suggested_fix: "She did the thing. No 'finding' needed."
+    - phrase: "seemed to"
+      penalty_score: 0.5
+      suggested_fix: "Commit to the action or observation."
+    - phrase: "began to"
+      penalty_score: 0.4
+      suggested_fix: "Just have them do it."
+    - phrase: "started to"
+      penalty_score: 0.4
+      suggested_fix: "Just have them do it."
+    - phrase: "proceeded to"
+      penalty_score: 0.6
+      suggested_fix: "Delete entirely."
+    - phrase: "managed to"
+      penalty_score: 0.5
+      suggested_fix: "Just have them do it."
+    - phrase: "Too [Adjective]. Too [Adjective]."
+      context: "fragment pattern, not deliberate dialogue"
+      penalty_score: 0.9
+      suggested_fix: "Combine into a flowing sentence or express the intensity differently."
+    - phrase: "Maybe both"
+      context: "A? B? Maybe both. reflective question structure"
+      penalty_score: 0.8
+      suggested_fix: "Commit to a specific observation or show the complexity through action."
+    - phrase: "Something I can't"
+      context: "vague internal hedging"
+      penalty_score: 0.8
+      suggested_fix: "Name the emotion/sensation directly or show through physical response."
+    - phrase: "Something I don't want to"
+      context: "vague internal hedging"
+      penalty_score: 0.8
+      suggested_fix: "Name the emotion/sensation directly or show through physical response."
+    - phrase: "all at once"
+      context: "X, Y, and Z all at once - list-based emotional summation"
+      penalty_score: 0.7
+      suggested_fix: "Show one emotion fully through action, let the others be implied."
+
+banned_cliches:
+  description: "Overused phrases that diminish narrative impact"
+  patterns:
+    - phrase: "heart pounded like a war drum"
+      penalty_score: 1.0
+      suggested_fix: "Describe specific cardiac sensation—racing, stuttering, thudding in ears."
+    - phrase: "walls I've built"
+      penalty_score: 0.9
+      suggested_fix: "Show the defensive behavior directly or use a fresh metaphor."
+    - phrase: "breaking down my walls"
+      penalty_score: 0.9
+      suggested_fix: "Show the moment of vulnerability through action."
+    - phrase: "anxiety coils in my stomach"
+      penalty_score: 0.8
+      suggested_fix: "Use specific physical sensations—nausea, tightness, hollowness."
+    - phrase: "burning bridges"
+      penalty_score: 0.8
+      suggested_fix: "Show the relationship damage through consequence or reaction."
+    - phrase: "legs turned to Jell-O"
+      penalty_score: 1.0
+      suggested_fix: "Describe specific muscle weakness—trembling, buckling, unreliability."
+    - phrase: "walking, talking"
+      context: "walking, talking [noun] construction"
+      penalty_score: 0.8
+      suggested_fix: "Find a more specific descriptor or show through behavior."
+    - phrase: "silence pressing in"
+      penalty_score: 0.8
+      suggested_fix: "Describe what fills the silence—ambient sounds, internal monologue."
+    - phrase: "silence thickens"
+      penalty_score: 0.8
+      suggested_fix: "Show the discomfort through character action or physical sensation."
+    - phrase: "eyes went wide"
+      penalty_score: 0.7
+      suggested_fix: "Show surprise through specific facial detail or freeze response."
+    - phrase: "sucker punch"
+      penalty_score: 1.0
+      suggested_fix: "Describe the physical impact of the realization—wind knocked out, sudden nausea, balance loss."
+    - phrase: "air shifts"
+      penalty_score: 0.7
+      suggested_fix: "Show the change through character perception or physical sensation, not atmospheric metaphor."
+    - phrase: "air changes"
+      penalty_score: 0.7
+      suggested_fix: "Show the change through character perception or physical sensation, not atmospheric metaphor."
+    - phrase: "air thickens"
+      penalty_score: 0.8
+      suggested_fix: "Show tension through character action, breath, or physical proximity."
+    - phrase: "heels clicking"
+      penalty_score: 0.7
+      suggested_fix: "Show character movement or presence without the clichéd sound effect."
+    - phrase: "heels clicked"
+      penalty_score: 0.7
+      suggested_fix: "Show character movement or presence without the clichéd sound effect."
+
+weak_vague_phrasing:
+  description: "Language that lacks sensory precision"
+  patterns:
+    - phrase: "smacked me"
+      context: "abstract noun + violent verb (e.g., 'relief smacked me')"
+      penalty_score: 0.8
+      suggested_fix: "Show the emotional shift through physical sensation or action."
+    - phrase: "heart overflowing"
+      penalty_score: 0.7
+      suggested_fix: "Describe the specific emotional sensation—warmth in chest, pressure behind eyes."
+    - phrase: "gravitational pull"
+      context: "metaphor for attraction"
+      penalty_score: 0.6
+      suggested_fix: "Limit to one use per book maximum. Find physical specifics instead."
+    - phrase: "storm of headlines"
+      penalty_score: 0.8
+      suggested_fix: "Show specific media consequences—quotes, images, notifications."
+    - phrase: "holding on out of spite"
+      penalty_score: 0.7
+      suggested_fix: "Show the action of holding on, let spite be implied through internal fire."
+    - phrase: "processing"
+      context: "as a verb for thinking"
+      penalty_score: 0.7
+      suggested_fix: "Show the mental work through micro-expressions, silence, or specific thoughts."
+
+watch_list_limited_use:
+  description: "Allowed but heavily restricted—use sparingly"
+  patterns:
+    - phrase: "storm"
+      context: "metaphor not actual weather"
+      max_uses_per_book: 2
+      suggested_fix: "Reserve for thematic significance or actual weather."
+    - phrase: "fire"
+      context: "emotional metaphor"
+      max_uses_per_book: 3
+      suggested_fix: "Reserve for passionate conflict or actual flames."
+    - phrase: "unravel"
+      context: "high risk in intimate scenes"
+      max_uses_per_book: 2
+      suggested_fix: "Use concrete physical verbs instead."
+    - phrase: "husky"
+      context: "voice description"
+      penalty_score: 0.5
+      suggested_fix: "Use 'rough,' 'deep,' or 'gravel' for more specific sound."
+    - phrase: "growled"
+      penalty_score: 0.5
+      suggested_fix: "Use 'gritted out' or 'said low' unless truly animalistic tone."
+
+atmospheric_cliches:
+  description: "Banned 'air thickness' and 'charged atmosphere' metaphors"
+  patterns:
+    - phrase: "air was thick"
+      penalty_score: 1.0
+      suggested_fix: "Describe specific sensory details (silence, static, heat, smell) or internal reaction."
+    - phrase: "air felt heavy"
+      penalty_score: 0.9
+      suggested_fix: "Focus on physical sensation of pressure or humidity, or internal emotional weight."
+    - phrase: "air crackled"
+      penalty_score: 0.9
+      suggested_fix: "Describe the tension through stillness, micro-movements, or electrical analogies only if literal."
+    - phrase: "charged air"
+      penalty_score: 0.9
+      suggested_fix: "Describe the magnetic pull between characters or the physiological response to proximity."
+    - phrase: "tension thick enough to cut"
+      penalty_score: 1.0
+      suggested_fix: "Absolute ban. Show the tension through behavior or silence."
