@@ -8,21 +8,31 @@ export class PatternLinter {
 
         // 1. Check Cliche Collider
         if (data.cliches) {
-            this.checkCategory(text, data.cliches.somatic_cliches, 'Somatic Cliche', vscode.DiagnosticSeverity.Warning, diagnostics, document);
-            this.checkCategory(text, data.cliches.overused_adjectives_adverbs, 'Overused Adjective/Adverb', vscode.DiagnosticSeverity.Information, diagnostics, document);
-            this.checkCategory(text, data.cliches.weak_descriptors, 'Weak Descriptor', vscode.DiagnosticSeverity.Information, diagnostics, document);
-            this.checkCategory(text, data.cliches.emotion_tells, 'Emotion Tell', vscode.DiagnosticSeverity.Warning, diagnostics, document);
-            this.checkCategory(text, data.cliches.purple_prose, 'Purple Prose', vscode.DiagnosticSeverity.Warning, diagnostics, document);
-            this.checkCategory(text, data.cliches.banned_cliches?.patterns, 'Banned Cliche', vscode.DiagnosticSeverity.Error, diagnostics, document);
-            this.checkCategory(text, data.cliches.ai_structural_patterns?.patterns, 'AI Structural Pattern', vscode.DiagnosticSeverity.Error, diagnostics, document);
-            this.checkCategory(text, data.cliches.similes?.patterns, 'Simile Detection', vscode.DiagnosticSeverity.Information, diagnostics, document);
+            diagnostics.push(...this.checkCategory(text, data.cliches.somatic_cliches, 'Somatic Cliche', vscode.DiagnosticSeverity.Warning, document));
+            diagnostics.push(...this.checkCategory(text, data.cliches.overused_adjectives_adverbs, 'Overused Adjective/Adverb', vscode.DiagnosticSeverity.Information, document));
+            diagnostics.push(...this.checkCategory(text, data.cliches.weak_descriptors, 'Weak Descriptor', vscode.DiagnosticSeverity.Information, document));
+            diagnostics.push(...this.checkCategory(text, data.cliches.emotion_tells, 'Emotion Tell', vscode.DiagnosticSeverity.Warning, document));
+            diagnostics.push(...this.checkCategory(text, data.cliches.purple_prose, 'Purple Prose', vscode.DiagnosticSeverity.Warning, document));
+            diagnostics.push(...this.checkCategory(text, data.cliches.banned_cliches?.patterns, 'Banned Cliche', vscode.DiagnosticSeverity.Error, document));
+            diagnostics.push(...this.checkCategory(text, data.cliches.ai_structural_patterns?.patterns, 'AI Structural Pattern', vscode.DiagnosticSeverity.Error, document));
+
+            // Similes specific - Count total
+            const simileDiagnostics = this.checkCategory(text, data.cliches.similes?.patterns, 'Simile Detection', vscode.DiagnosticSeverity.Information, document);
+            if (simileDiagnostics.length > 0) {
+                const totalSimiles = simileDiagnostics.length;
+                simileDiagnostics.forEach(d => {
+                    d.message = `${d.message} (Total: ${totalSimiles})`;
+                });
+                diagnostics.push(...simileDiagnostics);
+            }
         }
 
         return diagnostics;
     }
 
-    private checkCategory(text: string, items: any[], categoryInfo: string, severity: vscode.DiagnosticSeverity, diagnostics: vscode.Diagnostic[], document: vscode.TextDocument) {
-        if (!items || !Array.isArray(items)) return;
+    private checkCategory(text: string, items: any[], categoryInfo: string, severity: vscode.DiagnosticSeverity, document: vscode.TextDocument): vscode.Diagnostic[] {
+        const diagnostics: vscode.Diagnostic[] = [];
+        if (!items || !Array.isArray(items)) return diagnostics;
 
         for (const item of items) {
             const pattern = item.phrase || item.pattern;
@@ -46,6 +56,7 @@ export class PatternLinter {
                 diagnostics.push(diagnostic);
             }
         }
+        return diagnostics;
     }
 
     private isInsideQuotes(index: number, text: string): boolean {
