@@ -15,6 +15,7 @@ export class PatternLinter {
             this.checkCategory(text, data.cliches.purple_prose, 'Purple Prose', vscode.DiagnosticSeverity.Warning, diagnostics, document);
             this.checkCategory(text, data.cliches.banned_cliches?.patterns, 'Banned Cliche', vscode.DiagnosticSeverity.Error, diagnostics, document);
             this.checkCategory(text, data.cliches.ai_structural_patterns?.patterns, 'AI Structural Pattern', vscode.DiagnosticSeverity.Error, diagnostics, document);
+            this.checkCategory(text, data.cliches.similes?.patterns, 'Simile Detection', vscode.DiagnosticSeverity.Information, diagnostics, document);
         }
 
         return diagnostics;
@@ -30,6 +31,11 @@ export class PatternLinter {
             const regex = new RegExp(`\\b${this.escapeRegExp(pattern)}\\b`, 'gi');
             let match;
             while ((match = regex.exec(text)) !== null) {
+                // Check for exclude_dialogue flag
+                if (item.exclude_dialogue && this.isInsideQuotes(match.index, text)) {
+                    continue;
+                }
+
                 const startPos = document.positionAt(match.index);
                 const endPos = document.positionAt(match.index + match[0].length);
                 const range = new vscode.Range(startPos, endPos);
@@ -40,6 +46,20 @@ export class PatternLinter {
                 diagnostics.push(diagnostic);
             }
         }
+    }
+
+    private isInsideQuotes(index: number, text: string): boolean {
+        let quoteCount = 0;
+        // Simple parity check: count quotes from start of paragraph (or text) to index.
+        const lastNewline = text.lastIndexOf('\n', index);
+        const searchStart = lastNewline === -1 ? 0 : lastNewline;
+
+        for (let i = searchStart; i < index; i++) {
+            if (text[i] === '"' || text[i] === '“' || text[i] === '”') {
+                quoteCount++;
+            }
+        }
+        return quoteCount % 2 !== 0;
     }
 
     private escapeRegExp(string: string) {
