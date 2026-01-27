@@ -2,7 +2,7 @@
   "name": "fiction-linter",
   "displayName": "Fiction Linter",
   "description": "Lint documents for fiction associated issues like simile quality, cliches, character name violations, etc",
-  "version": "0.0.3",
+  "version": "0.0.5",
   "publisher": "ocotillo-quill-press-llc",
   "repository": {
     "type": "git",
@@ -28,6 +28,11 @@
           "type": "string",
           "default": "",
           "description": "Absolute path to the Semantic Physics Engine (SPE) configuration directory."
+        },
+        "fiction-linter.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable or disable the Fiction Linter."
         }
       }
     }

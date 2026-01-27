@@ -8,6 +8,9 @@ let diagnosticCollection: vscode.DiagnosticCollection;
 let patternLinter: PatternLinter;
 let nameValidator: NameValidator;
 
+// Status Bar Item
+let statusBarItem: vscode.StatusBarItem;
+
 export function activate(context: vscode.ExtensionContext) {
 	console.log('Fiction Linter is now active');
 
@@ -17,6 +20,12 @@ export function activate(context: vscode.ExtensionContext) {
 	diagnosticCollection = vscode.languages.createDiagnosticCollection('fiction-linter');
 
 	context.subscriptions.push(diagnosticCollection);
+
+	// Create Status Bar Item
+	statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
+	statusBarItem.command = 'fiction-linter.toggle';
+	context.subscriptions.push(statusBarItem);
+	updateStatusBar();
 
 	// Lint active document on load
 	if (vscode.window.activeTextEditor) {
@@ -45,6 +54,10 @@ export function activate(context: vscode.ExtensionContext) {
 				// Re-lint all open documents
 				vscode.workspace.textDocuments.forEach(lintDocument);
 			}
+			if (e.affectsConfiguration('fiction-linter.enabled')) {
+				updateStatusBar();
+				vscode.workspace.textDocuments.forEach(lintDocument);
+			}
 		})
 	);
 
@@ -55,11 +68,39 @@ export function activate(context: vscode.ExtensionContext) {
 			vscode.window.showInformationMessage('Fiction Linter: Workspace linted.');
 		})
 	);
+
+	// Register Toggle Command
+	context.subscriptions.push(
+		vscode.commands.registerCommand('fiction-linter.toggle', async () => {
+			const config = vscode.workspace.getConfiguration('fiction-linter');
+			const current = config.get<boolean>('enabled');
+			await config.update('enabled', !current, vscode.ConfigurationTarget.Global);
+		})
+	);
+}
+
+function updateStatusBar() {
+	const enabled = vscode.workspace.getConfiguration('fiction-linter').get<boolean>('enabled');
+	if (enabled) {
+		statusBarItem.text = '$(eye) Fiction Linter';
+		statusBarItem.tooltip = 'Fiction Linter is Active (Click to Disable)';
+		statusBarItem.show();
+	} else {
+		statusBarItem.text = '$(eye-closed) Fiction Linter';
+		statusBarItem.tooltip = 'Fiction Linter is Disabled (Click to Enable)';
+		statusBarItem.show();
+	}
 }
 
 function lintDocument(document: vscode.TextDocument) {
 	if (document.languageId !== 'markdown' && document.languageId !== 'plaintext') {
 		return; // Only lint markdown/text files
+	}
+
+	const enabled = vscode.workspace.getConfiguration('fiction-linter').get<boolean>('enabled');
+	if (!enabled) {
+		diagnosticCollection.delete(document.uri);
+		return;
 	}
 
 	const data = speController.getData();
