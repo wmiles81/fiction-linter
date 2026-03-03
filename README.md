@@ -1,5 +1,9 @@
 # Fiction Linter
 
+<p align="center">
+  <img src="images/banner.jpg" alt="The future writes in ink and code" width="600">
+</p>
+
 **Fiction Linter** is a VS Code extension designed to act as a **Semantic Physics Engine (SPE)** for your fiction writing. It helps you avoid "First Probability" prose—generic, clichéd, or AI-sounding text—by rigorously checking your manuscript against a set of constraints.
 
 ## Installation
