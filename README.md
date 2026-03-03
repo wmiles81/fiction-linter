@@ -2,6 +2,41 @@
 
 **Fiction Linter** is a VS Code extension designed to act as a **Semantic Physics Engine (SPE)** for your fiction writing. It helps you avoid "First Probability" prose—generic, clichéd, or AI-sounding text—by rigorously checking your manuscript against a set of constraints.
 
+## Installation
+
+### From the VS Code Extension Marketplace
+
+1.  Open VS Code.
+2.  Go to the **Extensions** view (`Cmd+Shift+X` on macOS / `Ctrl+Shift+X` on Windows/Linux).
+3.  Search for **"Fiction Linter"**.
+4.  Click **Install**.
+
+Or install from the command line:
+
+```bash
+code --install-extension ocotillo-quill-press-llc.fiction-linter
+```
+
+### From a Local `.vsix` File
+
+If you have a pre-built `.vsix` package (e.g., `fiction-linter-1.0.1.vsix`):
+
+**Option A — Via the VS Code UI:**
+
+1.  Open the **Extensions** view (`Cmd+Shift+X` / `Ctrl+Shift+X`).
+2.  Click the **`···`** menu (top-right of the Extensions panel).
+3.  Select **"Install from VSIX…"**.
+4.  Browse to and select the `.vsix` file.
+5.  Reload VS Code when prompted.
+
+**Option B — Via the command line:**
+
+```bash
+code --install-extension path/to/fiction-linter-1.0.1.vsix
+```
+
+> **Tip:** To build a `.vsix` from source, run `npx @vscode/vsce package` from the project root. This requires [Node.js](https://nodejs.org/) and will produce a `.vsix` file you can share or install.
+
 ## Features
 
 -   **Pattern Linter**: Detects and flags:
