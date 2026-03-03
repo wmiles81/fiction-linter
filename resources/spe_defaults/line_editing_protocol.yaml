@@ -48,10 +48,10 @@ principles:
       - "Remove polite, balanced, symmetrical phrasing."
       - "Add interruptions, fragments, evasions, contradictions, and emotional friction as appropriate."
       - "Keep grammar natural to the speaker, not formal or neutral."
+      - "Allow 'Somatic-Conceptual Fusion' (e.g., 'smells like bleach and existential dread') ONLY in dialogue to show character voice/wit."
     examples:
       bad: '"I understand your perspective, and I appreciate you sharing it with me."'
       good: '"Yeah, no, I get it. Just—" She shook her head. "Forget it."'
-      - "Allow 'Somatic-Conceptual Fusion' (e.g., 'smells like bleach and existential dread') ONLY in dialogue to show character voice/wit."
 
   sentence_rhythm:
     description: "Vary sentence length to reflect emotional pacing."

@@ -1,0 +1,51 @@
+# Files excluded from AI context
+# Managed by Context Gating extension
+
+../../AntiGravity/Writing Projects/Orc Romance - Snowstorm + Writer/books/book-1/phase-9-polishing
+../../AntiGravity/Writing Projects/Orc Romance - Snowstorm + Writer/books/book-1/phase-9-polishing/AGENT_TASKS.md
+../../AntiGravity/Writing Projects/Orc Romance - Snowstorm + Writer/books/book-1/phase-9-polishing/chapters-20251216
+../../AntiGravity/Writing Projects/Orc Romance - Snowstorm + Writer/books/book-1/phase-9-polishing/chapters-20251216/ch01.md
+../../AntiGravity/Writing Projects/Orc Romance - Snowstorm + Writer/books/book-1/phase-9-polishing/chapters-20251216/ch02.md
+../../AntiGravity/Writing Projects/Orc Romance - Snowstorm + Writer/books/book-1/phase-9-polishing/chapters-20251216/ch03.md
+../../AntiGravity/Writing Projects/Orc Romance - Snowstorm + Writer/books/book-1/phase-9-polishing/chapters-20251216/ch04.md
+../../AntiGravity/Writing Projects/Orc Romance - Snowstorm + Writer/books/book-1/phase-9-polishing/chapters-20251216/ch05.md
+../../AntiGravity/Writing Projects/Orc Romance - Snowstorm + Writer/books/book-1/phase-9-polishing/chapters-20251216/ch06.md
+../../AntiGravity/Writing Projects/Orc Romance - Snowstorm + Writer/books/book-1/phase-9-polishing/chapters-20251216/ch07.md
+../../AntiGravity/Writing Projects/Orc Romance - Snowstorm + Writer/books/book-1/phase-9-polishing/chapters-20251216/ch08.md
+../../AntiGravity/Writing Projects/Orc Romance - Snowstorm + Writer/books/book-1/phase-9-polishing/chapters-20251216/ch09.md
+../../AntiGravity/Writing Projects/Orc Romance - Snowstorm + Writer/books/book-1/phase-9-polishing/chapters-20251216/ch10.md
+../../AntiGravity/Writing Projects/Orc Romance - Snowstorm + Writer/books/book-1/phase-9-polishing/chapters-20251216/ch11.md
+../../AntiGravity/Writing Projects/Orc Romance - Snowstorm + Writer/books/book-1/phase-9-polishing/chapters-20251216/ch12.md
+../../AntiGravity/Writing Projects/Orc Romance - Snowstorm + Writer/books/book-1/phase-9-polishing/chapters-20251216/ch13.md
+../../AntiGravity/Writing Projects/Orc Romance - Snowstorm + Writer/books/book-1/phase-9-polishing/chapters-20251216/ch14.md
+../../AntiGravity/Writing Projects/Orc Romance - Snowstorm + Writer/books/book-1/phase-9-polishing/chapters-20251216/ch15.md
+../../AntiGravity/Writing Projects/Orc Romance - Snowstorm + Writer/books/book-1/phase-9-polishing/chapters-20251216/ch16.md
+../../AntiGravity/Writing Projects/Orc Romance - Snowstorm + Writer/books/book-1/phase-9-polishing/chapters-20251216/ch17.md
+../../AntiGravity/Writing Projects/Orc Romance - Snowstorm + Writer/books/book-1/phase-9-polishing/chapters-20251216/ch18.md
+../../AntiGravity/Writing Projects/Orc Romance - Snowstorm + Writer/books/book-1/phase-9-polishing/chapters-20251216/ch19.md
+../../AntiGravity/Writing Projects/Orc Romance - Snowstorm + Writer/books/book-1/phase-9-polishing/chapters-20251216/ch20.md
+../../AntiGravity/Writing Projects/Orc Romance - Snowstorm + Writer/books/book-1/phase-9-polishing/chapters-20251216/ch21.md
+../../AntiGravity/Writing Projects/Orc Romance - Snowstorm + Writer/books/book-1/phase-9-polishing/chapters-20251216/ch22.md
+../../AntiGravity/Writing Projects/Orc Romance - Snowstorm + Writer/books/book-1/phase-9-polishing/chapters-20251216/ch23.md
+../../AntiGravity/Writing Projects/Orc Romance - Snowstorm + Writer/books/book-1/phase-9-polishing/chapters-20251216/ch24.md
+../../AntiGravity/Writing Projects/Orc Romance - Snowstorm + Writer/books/book-1/phase-9-polishing/chapters-20251216/ch25.md
+../../AntiGravity/Writing Projects/Orc Romance - Snowstorm + Writer/books/book-1/phase-9-polishing/chapters-20251216/ch26.md
+../../AntiGravity/Writing Projects/Orc Romance - Snowstorm + Writer/books/book-1/phase-9-polishing/chapters-20251216/ch27.md
+../../AntiGravity/Writing Projects/Orc Romance - Snowstorm + Writer/books/book-1/phase-9-polishing/chapters-20251216/ch28.md
+../../AntiGravity/Writing Projects/Orc Romance - Snowstorm + Writer/books/book-1/phase-9-polishing/chapters-20251216/ch29.md
+../../AntiGravity/Writing Projects/Orc Romance - Snowstorm + Writer/books/book-1/phase-9-polishing/chapters-20251216/ch30.md
+../../AntiGravity/Writing Projects/Orc Romance - Snowstorm + Writer/books/book-1/phase-9-polishing/copy-edit-report.md
+../../AntiGravity/Writing Projects/Orc Romance - Snowstorm + Writer/books/book-1/phase-9-polishing/proofread-report.md
+src
+src/controllers
+src/controllers/AIController.ts
+src/controllers/SPEController.ts
+src/controllers/ScannerController.ts
+src/extension.ts
+src/linters
+src/linters/NameValidator.ts
+src/linters/PatternLinter.ts
+src/providers
+src/providers/FixActionProvider.ts
+src/test
+src/test/extension.test.ts

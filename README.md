@@ -46,12 +46,35 @@ The extension looks for:
 *   `place_collider.yaml`
 *   `line_editing_protocol.yaml`
 
+## AI Features
+This extension includes AI-powered tools to help you fix prose issues:
+*   **Fix with AI**: Click "Quick Fix" on any squiggly line to have AI rewrite the sentence.
+*   **Deep Scan (AI Scan)**:
+    *   **Button**: Click the **`$(search) AI Scan`** button in the status bar (bottom left).
+    *   **Scope**:
+        *   **Chapter Mode**: If your cursor is inside a chapter (marked by `## Chapter X`), it scans *only* that chapter.
+        *   **Full Mode**: If no characters are detected, it scans the entire document.
+    *   **Progressive**: Scans in background chunks (default 5 paragraphs) so you can keep working.
+    *   **Cancel**: Click the button again (`$(sync~spin) Stop Scan`) to cancel immediately.
+
+**Configuration:**
+The extension attempts to use available VS Code Copilot models first. If none are found, you can configure a direct connection to OpenAI:
+1.  `fiction-linter.openAiKey`: Your OpenAI API Key.
+2.  `fiction-linter.modelName`: (Optional) Model to use (default: `gpt-4`).
+3.  `fiction-linter.apiBaseUrl`: (Optional) Custom endpoint (default: OpenAI).
+4.  `fiction-linter.autoAiScanChunkSize`: Number of paragraphs to scan at once (default: 5). Increase for faster scans if your API limits allow.
+
 ## Requirements
 
 -   VS Code 1.100.0 or higher.
 -   A local copy of the Semantic Physics Engine data files.
 
 ## Release Notes
+
+### 0.1.5
+-   **AI Scan Button**: Added status bar button to trigger progressive AI scanning.
+-   **Chapter Detection**: Scans are now scoped to the current chapter.
+-   **Bug Fixes**: Improved Markdown activation and stability.
 
 ### 0.0.1
 -   Initial release.

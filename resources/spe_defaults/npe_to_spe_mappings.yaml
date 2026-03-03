@@ -6,7 +6,7 @@
 #
 # Created: 2026-01-24
 
----
+
 
 # Tension Level → Entropy Profile
 # NPE tension values (0.0 - 1.0) map to SPE entropy profiles
@@ -36,7 +36,7 @@ tension_to_entropy_profile:
       recommended_lenses: [somatics, thermodynamics]
       banned_words: [suddenly, then, next]
 
----
+
 
 # Character MCS → SPE Archetype
 # NPE's Motivation-Conflict-Stakes patterns map to SPE character archetypes
@@ -93,7 +93,7 @@ mcs_to_archetype:
     base_modifier: 1.5
     rationale: "Economy of characterization"
 
----
+
 
 # NPE Dimension Values → SPE Stress State
 # Emotional state from NPE drives stress modifier selection
@@ -145,7 +145,7 @@ dimension_to_stress:
     stress: calm
     modifier: 1.0
 
----
+
 
 # NPE Scene Type → SPE Sensory Lenses
 # Scene classification determines lens selection
@@ -202,7 +202,7 @@ scene_type_to_lenses:
     secondary: specific_grounding
     notes: "Sounds of joy + concrete celebratory details"
 
----
+
 
 # Context Modifiers (from SPE character_entropy_budgets.yaml)
 # These apply on top of archetype and stress modifiers
@@ -227,7 +227,7 @@ context_modifiers:
     modifier: 1.2
     description: "Informational passages can use some conventional framing"
 
----
+
 
 # Voice Mechanics Activation
 # Gender-specific voice profiles based on POV character
@@ -248,7 +248,7 @@ voice_mechanics:
     pacing: linear
     lens_bias: [visual_action, thermodynamics, somatics]
 
----
+
 
 # Effective Tolerance Calculation
 # Formula: profile.tolerance × archetype.modifier × stress.modifier × context.modifier

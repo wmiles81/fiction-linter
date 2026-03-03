@@ -2,7 +2,16 @@ import * as vscode from 'vscode';
 import { SPEData } from '../controllers/SPEController';
 
 export class PatternLinter {
+    private cache: Map<string, { regex: RegExp, map: Map<string, any> }> = new Map();
+    private lastData: SPEData | undefined;
+
     public lint(document: vscode.TextDocument, data: SPEData): vscode.Diagnostic[] {
+        // Clear cache if data reference changes (config reload)
+        if (this.lastData !== data) {
+            this.cache.clear();
+            this.lastData = data;
+        }
+
         const diagnostics: vscode.Diagnostic[] = [];
         const text = document.getText();
 
@@ -17,7 +26,8 @@ export class PatternLinter {
             diagnostics.push(...this.checkCategory(text, data.cliches.ai_structural_patterns?.patterns, 'AI Structural Pattern', vscode.DiagnosticSeverity.Error, document));
 
             // Similes specific - Count total
-            const simileDiagnostics = this.checkCategory(text, data.cliches.similes?.patterns, 'Simile Detection', vscode.DiagnosticSeverity.Information, document);
+            const simileDiagnostics = this.checkCategory(text, data.cliches.similes?.patterns, 'Simile Detection', vscode.DiagnosticSeverity.Warning, document);
+            console.log(`PatternLinter: Found ${simileDiagnostics.length} similes.`);
             if (simileDiagnostics.length > 0) {
                 const totalSimiles = simileDiagnostics.length;
                 simileDiagnostics.forEach(d => {
@@ -32,30 +42,65 @@ export class PatternLinter {
 
     private checkCategory(text: string, items: any[], categoryInfo: string, severity: vscode.DiagnosticSeverity, document: vscode.TextDocument): vscode.Diagnostic[] {
         const diagnostics: vscode.Diagnostic[] = [];
-        if (!items || !Array.isArray(items)) return diagnostics;
+        if (!items || !Array.isArray(items) || items.length === 0) return diagnostics;
 
-        for (const item of items) {
-            const pattern = item.phrase || item.pattern;
-            if (!pattern) continue;
+        // 1. Get or Create Cached Regex/Map
+        let cached = this.cache.get(categoryInfo);
+        if (!cached) {
+            const map = new Map<string, any>();
+            const patterns: string[] = [];
 
-            const regex = new RegExp(`\\b${this.escapeRegExp(pattern)}\\b`, 'gi');
-            let match;
-            while ((match = regex.exec(text)) !== null) {
-                // Check for exclude_dialogue flag
-                if (item.exclude_dialogue && this.isInsideQuotes(match.index, text)) {
-                    continue;
-                }
+            // Sort by length descending to match longest phrases first (e.g. "shrug" vs "shrug off")
+            // We clone to avoid mutating the original data
+            const sortedItems = [...items].sort((a, b) => {
+                const pA = a.phrase || a.pattern || '';
+                const pB = b.phrase || b.pattern || '';
+                return pB.length - pA.length;
+            });
 
-                const startPos = document.positionAt(match.index);
-                const endPos = document.positionAt(match.index + match[0].length);
-                const range = new vscode.Range(startPos, endPos);
+            for (const item of sortedItems) {
+                const pattern = item.phrase || item.pattern;
+                if (!pattern) continue;
 
-                const message = `${categoryInfo}: "${pattern}". Penalty: ${item.penalty_score || 'N/A'}. ${item.suggested_fix ? 'Fix: ' + item.suggested_fix : ''}`;
-                const diagnostic = new vscode.Diagnostic(range, message, severity);
-                diagnostic.source = 'Fiction Linter';
-                diagnostics.push(diagnostic);
+                // Store in map (lowercase for case-insensitive lookup)
+                map.set(pattern.toLowerCase(), item);
+                patterns.push(this.escapeRegExp(pattern));
             }
+
+            if (patterns.length === 0) return diagnostics;
+
+            // optimized: \b(p1|p2|p3)\b
+            const regex = new RegExp(`\\b(${patterns.join('|')})\\b`, 'gi');
+            cached = { regex, map };
+            this.cache.set(categoryInfo, cached);
         }
+
+        // 2. Execute Single Regex Scan
+        // Reset lastIndex because we are reusing the regex instance
+        cached.regex.lastIndex = 0;
+
+        let match;
+        while ((match = cached.regex.exec(text)) !== null) {
+            const matchedText = match[0];
+            const item = cached.map.get(matchedText.toLowerCase());
+
+            if (!item) continue; // Should technically not happen if regex matches
+
+            // Check for exclude_dialogue flag
+            if (item.exclude_dialogue && this.isInsideQuotes(match.index, text)) {
+                continue;
+            }
+
+            const startPos = document.positionAt(match.index);
+            const endPos = document.positionAt(match.index + matchedText.length);
+            const range = new vscode.Range(startPos, endPos);
+
+            const message = `${categoryInfo}: "${matchedText}". Penalty: ${item.penalty_score || 'N/A'}. ${item.suggested_fix ? 'Fix: ' + item.suggested_fix : ''}`;
+            const diagnostic = new vscode.Diagnostic(range, message, severity);
+            diagnostic.source = 'Fiction Linter';
+            diagnostics.push(diagnostic);
+        }
+
         return diagnostics;
     }
 
@@ -74,6 +119,6 @@ export class PatternLinter {
     }
 
     private escapeRegExp(string: string) {
-        return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // $& means the whole matched string
+        return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     }
 }

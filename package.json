@@ -1,62 +1,172 @@
 {
-  "name": "fiction-linter",
-  "displayName": "Fiction Linter",
-  "description": "Lint documents for fiction associated issues like simile quality, cliches, character name violations, etc",
-  "version": "0.0.5",
-  "publisher": "ocotillo-quill-press-llc",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/ocotillo-quill-press-llc/fiction-linter"
-  },
-  "engines": {
-    "vscode": "^1.100.0"
-  },
-  "categories": [
-    "Other"
-  ],
-  "activationEvents": [
-    "onStartupFinished",
-    "onLanguage:markdown",
-    "onLanguage:plaintext"
-  ],
-  "main": "./out/extension.js",
-  "contributes": {
-    "configuration": {
-      "title": "Fiction Linter",
-      "properties": {
-        "fiction-linter.spePath": {
-          "type": "string",
-          "default": "",
-          "description": "Absolute path to the Semantic Physics Engine (SPE) configuration directory."
+    "name": "fiction-linter",
+    "displayName": "Fiction Linter",
+    "description": "Lint documents for fiction associated issues like simile quality, cliches, character name violations, etc",
+    "version": "1.0.1",
+    "publisher": "ocotillo-quill-press-llc",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/ocotillo-quill-press-llc/fiction-linter"
+    },
+    "engines": {
+        "vscode": "^1.95.0"
+    },
+    "categories": [
+        "Other"
+    ],
+    "activationEvents": [
+        "onStartupFinished",
+        "onLanguage:markdown",
+        "onLanguage:plaintext"
+    ],
+    "main": "./out/extension.js",
+    "contributes": {
+        "configuration": {
+            "title": "Fiction Linter",
+            "properties": {
+                "fiction-linter.spePath": {
+                    "type": "string",
+                    "default": "",
+                    "description": "Absolute path to the Semantic Physics Engine (SPE) configuration directory."
+                },
+                "fiction-linter.enabled": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Enable or disable the Fiction Linter."
+                },
+                "fiction-linter.aiEnabled": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Enable or disable AI analysis features."
+                },
+                "fiction-linter.aiPreference": {
+                    "type": "string",
+                    "enum": [
+                        "api-key-first",
+                        "vscode-model-first"
+                    ],
+                    "default": "api-key-first",
+                    "description": "Which AI provider to try first. 'api-key-first' skips VS Code model polling if API key is configured."
+                },
+                "fiction-linter.openAiKey": {
+                    "type": "string",
+                    "default": "",
+                    "description": "Optional: OpenAI API Key for AI features if no VS Code model provider is found."
+                },
+                "fiction-linter.modelName": {
+                    "type": "string",
+                    "default": "gpt-4",
+                    "description": "Model to use when using API Key (e.g. gpt-4, gpt-3.5-turbo, o1-mini)."
+                },
+                "fiction-linter.apiBaseUrl": {
+                    "type": "string",
+                    "default": "https://api.openai.com/v1/chat/completions",
+                    "description": "Base URL for the AI API (useful for proxies or local models)."
+                },
+                "fiction-linter.autoAiScan": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Automatically scan documents with AI when opened (uses API calls)."
+                },
+                "fiction-linter.autoAiScanChunkSize": {
+                    "type": "number",
+                    "default": 5,
+                    "description": "Number of paragraphs to scan per AI request during progressive background scanning."
+                }
+            }
         },
-        "fiction-linter.enabled": {
-          "type": "boolean",
-          "default": true,
-          "description": "Enable or disable the Fiction Linter."
+        "commands": [
+            {
+                "command": "fiction-linter.analyzeSelection",
+                "title": "Fiction Linter: Analyze Selection with AI"
+            },
+            {
+                "command": "fiction-linter.lintWorkspace",
+                "title": "Fiction Linter: Lint Entire Workspace"
+            },
+            {
+                "command": "fiction-linter.toggle",
+                "title": "Fiction Linter: Toggle On/Off"
+            },
+            {
+                "command": "fiction-linter.showAIStatus",
+                "title": "Fiction Linter: Show AI Status"
+            },
+            {
+                "command": "fiction-linter.toggleAiScan",
+                "title": "Fiction Linter: Toggle AI Scan"
+            },
+            {
+                "command": "fiction-linter.toggleAI",
+                "title": "Fiction Linter: Toggle AI On/Off"
+            },
+            {
+                "command": "fiction-linter.selectModel",
+                "title": "Fiction Linter: Select AI Model"
+            },
+            {
+                "command": "fiction-linter.setApiKey.openai",
+                "title": "Fiction Linter: Set OpenAI API Key"
+            },
+            {
+                "command": "fiction-linter.setApiKey.openrouter",
+                "title": "Fiction Linter: Set OpenRouter API Key"
+            }
+        ],
+        "menus": {
+            "editor/context": [
+                {
+                    "command": "fiction-linter.analyzeSelection",
+                    "group": "modification",
+                    "when": "editorHasSelection && (resourceLangId == markdown || resourceLangId == plaintext)"
+                }
+            ],
+            "editor/title": [
+                {
+                    "command": "fiction-linter.analyzeSelection",
+                    "group": "navigation",
+                    "when": "resourceLangId == markdown || resourceLangId == plaintext"
+                }
+            ]
+        },
+        "viewsContainers": {
+            "activitybar": [
+                {
+                    "id": "fiction-linter-explorer",
+                    "title": "Fiction Linter",
+                    "icon": "$(book)"
+                }
+            ]
+        },
+        "views": {
+            "fiction-linter-explorer": [
+                {
+                    "id": "fiction-linter.modelView",
+                    "name": "AI Models"
+                }
+            ]
         }
-      }
+    },
+    "scripts": {
+        "vscode:prepublish": "npm run compile",
+        "compile": "tsc -p ./",
+        "watch": "tsc -watch -p ./",
+        "pretest": "npm run compile && npm run lint",
+        "lint": "eslint src",
+        "test": "vscode-test"
+    },
+    "devDependencies": {
+        "@types/mocha": "^10.0.10",
+        "@types/node": "22.x",
+        "@types/vscode": "^1.95.0",
+        "@vscode/test-cli": "^0.0.12",
+        "@vscode/test-electron": "^2.5.2",
+        "eslint": "^9.39.2",
+        "typescript": "^5.9.3",
+        "typescript-eslint": "^8.52.0"
+    },
+    "dependencies": {
+        "@types/js-yaml": "^4.0.9",
+        "js-yaml": "^4.1.1"
     }
-  },
-  "scripts": {
-    "vscode:prepublish": "npm run compile",
-    "compile": "tsc -p ./",
-    "watch": "tsc -watch -p ./",
-    "pretest": "npm run compile && npm run lint",
-    "lint": "eslint src",
-    "test": "vscode-test"
-  },
-  "devDependencies": {
-    "@types/mocha": "^10.0.10",
-    "@types/node": "22.x",
-    "@types/vscode": "^1.100.0",
-    "@vscode/test-cli": "^0.0.12",
-    "@vscode/test-electron": "^2.5.2",
-    "eslint": "^9.39.2",
-    "typescript": "^5.9.3",
-    "typescript-eslint": "^8.52.0"
-  },
-  "dependencies": {
-    "@types/js-yaml": "^4.0.9",
-    "js-yaml": "^4.1.1"
-  }
 }

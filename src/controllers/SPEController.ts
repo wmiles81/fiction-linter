@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
-import * as yaml from 'js-yaml';
+import { load } from 'js-yaml';
 
 export interface SPEData {
     cliches: any;
@@ -48,17 +48,19 @@ export class SPEController {
             this.outputChannel.appendLine('SPE Data loaded successfully.');
         } catch (error) {
             this.outputChannel.appendLine(`Error loading SPE data: ${error}`);
-            vscode.window.showErrorMessage(`Fiction Linter: Error loading data. Check Output panel.`);
+            vscode.window.showErrorMessage(`Fiction Linter Load Error: ${error}`);
         }
     }
 
     private loadYaml(filename: string): any {
         const filePath = path.join(this.spePath, filename);
+        this.outputChannel.appendLine(`Attempting to load: ${filePath}`);
         if (fs.existsSync(filePath)) {
             const fileContents = fs.readFileSync(filePath, 'utf8');
-            return yaml.load(fileContents);
+            return load(fileContents);
         } else {
             this.outputChannel.appendLine(`Warning: Could not find file ${filename} at ${this.spePath}`);
+            vscode.window.showErrorMessage(`Missing File: ${filePath}`);
         }
         return {};
     }
