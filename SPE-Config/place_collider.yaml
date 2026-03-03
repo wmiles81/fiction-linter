@@ -1,0 +1,254 @@
+# Place Collider - Forbidden AI Default Place Names
+# Usage: Avoid these high-frequency AI place names.
+
+global_exclusion:
+  forbidden_town_names:
+    # Classic AI Defaults
+    - Willow Creek
+    - Maplewood
+    - Riverside
+    - Oakwood
+    - Pinehurst
+    - Cedar Falls
+    - Elmwood
+    - Ashford
+    - Brookhaven
+    - Fairview
+    - Greenwood
+    - Hillcrest
+    - Lakeside
+    - Meadowbrook
+    - Millbrook
+    - Oakdale
+    - Pinewood
+    - Ridgewood
+    - Rosewood
+    - Springdale
+    - Stonehaven
+    - Sunnyside
+    - Valleyview
+    - Westwood
+    - Willowdale
+    
+    # "Harbor" Pattern
+    - Harbor Point
+    - Safe Harbor
+    - Silver Harbor
+    - Crescent Harbor
+    - Misty Harbor
+    
+    # "Springs" Pattern
+    - Crystal Springs
+    - Silver Springs
+    - Willow Springs
+    - Cedar Springs
+    - Pine Springs
+    
+    # "Heights" Pattern
+    - Sterling Heights
+    - Maple Heights
+    - Oak Heights
+    - River Heights
+    - Summit Heights
+    
+    # "Glen" Pattern
+    - Shady Glen
+    - Willow Glen
+    - Maple Glen
+    - Oak Glen
+    - Silver Glen
+    
+    # "Bay" Pattern
+    - Crescent Bay
+    - Silver Bay
+    - Moonlight Bay
+    - Crystal Bay
+    - Emerald Bay
+    
+    # "Ridge" Pattern
+    - Maple Ridge
+    - Oak Ridge
+    - Pine Ridge
+    - Shadow Ridge
+    - Silver Ridge
+    
+    # "Vale" Pattern
+    - Moonvale
+    - Silvervale
+    - Shadowvale
+    - Crystalvale
+    - Evervale
+
+  forbidden_city_names:
+    - New Haven
+    - Port Sterling
+    - Silverton
+    - Ashbourne
+    - Blackwater
+    - Clearwater
+    - Fairhaven
+    - Goldcrest
+    - Ironforge
+    - Ravencrest
+    - Shadowmere
+    - Silverstone
+    - Stormhaven
+    - Whitehaven
+    - Winterfell
+    - Ravenwood
+    - Thornwood
+    - Blackwood
+    - Redwood
+    - Darkwood
+
+  forbidden_fantasy_locations:
+    # Kingdoms
+    - Kingdom of Eldoria
+    - Kingdom of Avalon
+    - Kingdom of Camelot
+    - Kingdom of Arcadia
+    - Kingdom of Valoria
+    
+    # Realms
+    - The Shadowlands
+    - The Darklands
+    - The Highlands
+    - The Lowlands
+    - The Borderlands
+    
+    # Forests
+    - Whispering Woods
+    - Darkwood Forest
+    - Shadowwood
+    - Silverwood
+    - Ironwood Forest
+    - Blackwood Forest
+    - The Enchanted Forest
+    - The Forbidden Forest
+    
+    # Mountains
+    - Ironpeak Mountains
+    - Frostpeak
+    - Stormcrest Mountains
+    - Dragon's Spine
+    - The Misty Mountains
+    
+    # Castles/Fortresses
+    - Ravencrest Castle
+    - Shadowkeep
+    - Ironhold
+    - Stormwatch
+    - Blackstone Keep
+    - Silverspire
+    - Darkspire
+
+  forbidden_tavern_inn_names:
+    - The Prancing Pony
+    - The Golden Lion
+    - The Silver Stag
+    - The Rusty Anchor
+    - The Drunken Dragon
+    - The Broken Wheel
+    - The Crooked Crow
+    - The Laughing Fox
+    - The Weary Traveler
+    - The King's Head
+    - The Queen's Rest
+    - The Dragon's Breath
+    - The Mermaid's Song
+    - The Black Swan
+    - The White Hart
+    - The Red Rose
+    - The Blue Boar
+    - The Green Dragon
+    - The Gilded Lily
+    - The Copper Kettle
+
+  forbidden_street_names:
+    - Main Street
+    - High Street
+    - Market Street
+    - Church Street
+    - Mill Street
+    - Bridge Street
+    - Water Street
+    - Oak Street
+    - Maple Street
+    - Elm Street
+    - Pine Street
+    - Cedar Street
+    - Willow Street
+    - River Road
+    - Lake Road
+    - Hill Road
+    - Valley Road
+    - Forest Lane
+    - Meadow Lane
+    - Garden Lane
+
+  forbidden_landmark_names:
+    # Bridges
+    - The Old Bridge
+    - Stone Bridge
+    - Wooden Bridge
+    - Iron Bridge
+    - Silver Bridge
+    
+    # Towers
+    - The Watchtower
+    - The Bell Tower
+    - The Clock Tower
+    - The Wizard's Tower
+    - The Dark Tower
+    
+    # Ruins
+    - The Ancient Ruins
+    - The Forgotten Temple
+    - The Lost City
+    - The Abandoned Mine
+    - The Cursed Graveyard
+    
+    # Natural Features
+    - The Crystal Lake
+    - The Silver River
+    - The Dark Cave
+    - The Hidden Valley
+    - The Sacred Grove
+
+  forbidden_district_names:
+    - The Old Quarter
+    - The Market District
+    - The Merchant Quarter
+    - The Noble District
+    - The Slums
+    - The Docks
+    - The Warehouse District
+    - The Temple District
+    - The Mage Quarter
+    - The Artisan Quarter
+    - The Garden District
+    - The Harbor District
+
+  forbidden_region_names:
+    - The Northlands
+    - The Southlands
+    - The Eastern Reaches
+    - The Western Marches
+    - The Heartlands
+    - The Wastelands
+    - The Wildlands
+    - The Borderlands
+    - The Hinterlands
+    - The Outlands
+
+# Guidance for Alternative Naming:
+# 
+# Instead of generic descriptors, use:
+# 1. Unexpected combinations (Saltmarsh, Thornbury, Copperdale)
+# 2. Historical references specific to your world
+# 3. Character-based names (founder, historical figure)
+# 4. Local language/dialect variations
+# 5. Functional names that reveal history (Tannery Row, Smelter's End)
+# 6. Ironic names (Prosperity during a depression, Paradise in a slum)
+# 7. Phonetically interesting but pronounceable invented names
+# 8. Names that hint at conflict or story (The Contested Shore, Twice-Burned)
