@@ -269,49 +269,6 @@ body {
     color: var(--accent);
 }
 
-.editor-panel {
-    background: var(--surface-strong);
-    border-radius: 20px;
-    padding: 20px 22px 16px;
-    box-shadow: var(--shadow);
-    display: flex;
-    flex-direction: column;
-    min-height: 420px;
-}
-
-.editor-header {
-    display: flex;
-    justify-content: space-between;
-    gap: 12px;
-    align-items: center;
-}
-
-.editor-header h2 {
-    margin: 0 0 4px;
-    font-family: 'Fraunces', serif;
-}
-
-.editor-path {
-    margin: 0;
-    color: var(--muted);
-    font-size: 12px;
-}
-
-.editor-textarea {
-    margin-top: 16px;
-    flex: 1;
-    width: 100%;
-    border-radius: 16px;
-    border: 1px solid var(--border);
-    padding: 16px;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 14px;
-    line-height: 1.6;
-    resize: none;
-    outline: none;
-    background: #fbfaf8;
-}
-
 .issues-panel {
     background: var(--surface);
     border-radius: 20px;
@@ -519,27 +476,6 @@ body {
     .workspace {
         flex-direction: column;
     }
-}
-
-/* --- CodeMirror surface (Phase 3) --- */
-.editor-surface {
-    flex: 1;
-    min-height: 0;
-    display: flex;
-    background: var(--g-bg, #ffffff);
-}
-
-.editor-surface .cm-editor {
-    flex: 1;
-    min-width: 0;
-}
-
-.editor-surface .cm-editor.cm-focused {
-    outline: none;
-}
-
-.editor-surface .cm-scroller {
-    line-height: 1.2;
 }
 
 .issue-actions {
@@ -781,4 +717,151 @@ body {
     border-radius: 3px;
     font-size: 12px;
     background: white;
+}
+
+/* --- Phase 7.7: WYSIWYG editor + toolbar + lint highlights --- */
+.editor-panel {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    min-width: 0;
+    background: var(--surface-strong, #faf7f0);
+    border-radius: 20px;
+    box-shadow: var(--shadow);
+    overflow: hidden;
+}
+
+.editor-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--g-border, #d7d2c5);
+    background: var(--g-surface, #faf7f0);
+    flex-shrink: 0;
+}
+
+.editor-toolbar button,
+.editor-toolbar select {
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 3px;
+    padding: 4px 8px;
+    font-size: 12px;
+    color: var(--g-text, #2a2620);
+    cursor: pointer;
+    min-width: 28px;
+}
+
+.editor-toolbar button:hover:not(:disabled),
+.editor-toolbar select:hover {
+    background: rgba(0, 0, 0, 0.05);
+    border-color: var(--g-border, #d7d2c5);
+}
+
+.editor-toolbar button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.editor-toolbar-separator {
+    width: 1px;
+    height: 20px;
+    background: var(--g-border, #d7d2c5);
+    margin: 0 4px;
+}
+
+.editor-toolbar-spacer {
+    flex: 1;
+}
+
+.toolbar-button-format strong,
+.toolbar-button-format em,
+.toolbar-button-format u {
+    font-style: normal;
+}
+
+.toolbar-toggle.on {
+    background: var(--g-accent-bg, #e8f0e8);
+    border-color: var(--g-accent, #4a7a4a);
+    color: var(--g-accent, #4a7a4a);
+}
+
+.paragraph-style-select {
+    padding: 4px 6px;
+    font-family: inherit;
+}
+
+.editor-surface {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 20px 40px;
+    font-family: 'Fraunces', Georgia, serif;
+    font-size: 16px;
+    line-height: 1.2;
+    outline: none;
+    background: var(--g-bg, #ffffff);
+    color: var(--g-text, #2a2620);
+}
+
+.editor-surface.wrap {
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+}
+
+.editor-surface:not(.wrap) {
+    white-space: pre;
+    overflow-x: auto;
+}
+
+.editor-surface h1 {
+    font-size: 28px;
+    font-weight: 700;
+    margin: 0.6em 0 0.3em;
+    line-height: 1.1;
+}
+
+.editor-surface h2 {
+    font-size: 22px;
+    font-weight: 700;
+    margin: 0.6em 0 0.3em;
+    line-height: 1.15;
+}
+
+.editor-surface h3 {
+    font-size: 18px;
+    font-weight: 600;
+    margin: 0.6em 0 0.3em;
+    line-height: 1.2;
+}
+
+.editor-surface p {
+    margin: 0 0 1em;
+    line-height: 1.2;
+}
+
+.editor-surface hr {
+    border: none;
+    border-top: 1px solid var(--g-border, #d7d2c5);
+    margin: 1.5em 0;
+    text-align: center;
+}
+
+/* CSS Custom Highlight API — lint squiggles without DOM mutation */
+::highlight(lint-error) {
+    text-decoration: underline wavy #c44;
+    text-decoration-skip-ink: none;
+}
+
+::highlight(lint-warning) {
+    text-decoration: underline wavy #c80;
+    text-decoration-skip-ink: none;
+}
+
+::highlight(lint-info) {
+    text-decoration: underline wavy #48a;
+    text-decoration-skip-ink: none;
 }

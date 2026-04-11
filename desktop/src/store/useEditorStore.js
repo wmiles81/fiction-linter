@@ -19,23 +19,45 @@ function pickNewActive(tabs, closingId, currentActiveId) {
 // fresh one reading from the latest state reference. Zustand state snapshots
 // are immutable, so the timeout always writes the most recent state.
 let _persistTimeout = null;
+function buildPersistPayload(state) {
+    return {
+        tabs: state.tabs.map(t => ({
+            id: t.id,
+            path: t.path,
+            name: t.name,
+            markdownSource: t.markdownSource,
+            dirty: t.dirty
+        })),
+        activeTabId: state.activeTabId
+    };
+}
 function persistNow(state) {
     if (typeof window === 'undefined' || !window.api?.saveTabs) return;
     if (_persistTimeout) clearTimeout(_persistTimeout);
     _persistTimeout = setTimeout(() => {
         _persistTimeout = null;
-        const payload = {
-            tabs: state.tabs.map(t => ({
-                id: t.id,
-                path: t.path,
-                name: t.name,
-                markdownSource: t.markdownSource,
-                dirty: t.dirty
-            })),
-            activeTabId: state.activeTabId
-        };
+        const payload = buildPersistPayload(state);
         window.api.saveTabs(payload).catch(() => { /* best effort */ });
     }, 400);
+}
+// Synchronous flush: cancels any pending debounce and writes the latest
+// state immediately. Used by App.jsx on `beforeunload` so dirty untitled
+// tabs do not lose their final 0-400ms of typing if the user quits during
+// the debounce window. (Persisted-with-path tabs are safe because hydrate
+// re-reads from disk on relaunch.)
+function flushPersist() {
+    if (_persistTimeout) {
+        clearTimeout(_persistTimeout);
+        _persistTimeout = null;
+    }
+    if (typeof window === 'undefined' || !window.api?.saveTabs) return;
+    const state = useEditorStore.getState();
+    const payload = buildPersistPayload(state);
+    try {
+        return window.api.saveTabs(payload);
+    } catch {
+        /* best effort */
+    }
 }
 
 // Zustand middleware: wraps `set` so every mutation writes to userData/tabs.json.
@@ -143,6 +165,8 @@ export const useEditorStore = create(withPersist((set, get) => ({
         const { tabs, activeTabId } = get();
         return tabs.find(t => t.id === activeTabId) ?? null;
     },
+
+    flushPersist,
 
     hydrate: async () => {
         if (typeof window === 'undefined' || !window.api?.loadTabs) return;

@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef } from 'react';
 import { PatternLinterCore, NameValidatorCore } from '@shared/linting';
 import FileTree from './components/FileTree';
-import EditorPanel from './components/EditorPanel';
+import Editor from './components/editor/Editor';
 import SettingsDialog from './components/SettingsDialog';
 import IssueList from './components/IssueList';
 import PanelResizer from './components/PanelResizer';
@@ -48,6 +48,7 @@ function App() {
     });
 
     const [showSettings, setShowSettings] = React.useState(false);
+    const [wrap, setWrap] = React.useState(true);
     const [leftPanelWidth, setLeftPanelWidth] = React.useState(() => {
         if (typeof window === 'undefined') return 260;
         try {
@@ -88,6 +89,18 @@ function App() {
     useEffect(() => {
         hydrate();
     }, [hydrate]);
+
+    // Phase 7.5 review follow-up: flush the persist debounce on window close so
+    // dirty untitled tabs do not lose their last 0-400ms of content if the user
+    // quits during the debounce window.
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        const handler = () => {
+            useEditorStore.getState().flushPersist?.();
+        };
+        window.addEventListener('beforeunload', handler);
+        return () => window.removeEventListener('beforeunload', handler);
+    }, []);
 
     useEffect(() => {
         if (!window.api?.onMenuAction) return;
@@ -316,15 +329,16 @@ function App() {
                         onClose={closeTab}
                         onCloseAll={closeAllTabs}
                     />
-                    <EditorPanel
+                    <Editor
                         ref={editorRef}
-                        file={currentFile}
-                        content={content}
-                        dirty={dirty}
-                        issues={visibleIssues}
+                        value={content}
                         onChange={updateContent}
+                        issues={visibleIssues}
+                        showFindings={showFindings}
                         onSave={handleSave}
                         onStateChange={setEditorState}
+                        wrap={wrap}
+                        onToggleWrap={() => setWrap(w => !w)}
                     />
                     <IssueList
                         issues={visibleIssues}
