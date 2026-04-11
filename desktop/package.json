@@ -6,7 +6,10 @@
   "scripts": {
     "dev": "VITE_DEV_SERVER_URL=http://localhost:5173 concurrently \"vite\" \"electron .\"",
     "build": "vite build",
-    "start": "electron ."
+    "start": "electron .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "electron": "^31.3.0",
@@ -15,8 +18,14 @@
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
     "@vitejs/plugin-react": "^4.3.1",
+    "@vitest/coverage-v8": "^4.1.4",
     "concurrently": "^9.0.1",
-    "vite": "^5.4.3"
+    "jsdom": "^29.0.2",
+    "vite": "^5.4.3",
+    "vitest": "^4.1.4"
   }
 }
