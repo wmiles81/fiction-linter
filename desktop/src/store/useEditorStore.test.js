@@ -92,4 +92,29 @@ describe('useEditorStore', () => {
         expect(tabs).toEqual([]);
         expect(activeTabId).toBeNull();
     });
+
+    it('hydrate populates tabs from window.api.loadTabs and re-reads file contents', async () => {
+        const fakePersisted = {
+            tabs: [
+                { id: 'tab-1', path: '/tmp/a.md', name: 'a.md', markdownSource: 'stale', dirty: true }
+            ],
+            activeTabId: 'tab-1'
+        };
+        const originalLoadTabs = window.api.loadTabs;
+        const originalReadFile = window.api.readFile;
+        window.api.loadTabs = async () => fakePersisted;
+        window.api.readFile = async () => ({ ok: true, contents: 'fresh content from disk' });
+
+        try {
+            await useEditorStore.getState().hydrate();
+            const state = useEditorStore.getState();
+            expect(state.tabs).toHaveLength(1);
+            expect(state.tabs[0].markdownSource).toBe('fresh content from disk');
+            expect(state.tabs[0].dirty).toBe(false);
+            expect(state.activeTabId).toBe('tab-1');
+        } finally {
+            window.api.loadTabs = originalLoadTabs;
+            window.api.readFile = originalReadFile;
+        }
+    });
 });

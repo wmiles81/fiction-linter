@@ -5,6 +5,7 @@ import EditorPanel from './components/EditorPanel';
 import SettingsDialog from './components/SettingsDialog';
 import IssueList from './components/IssueList';
 import PanelResizer from './components/PanelResizer';
+import TabBar from './components/TabBar';
 import { useAppStore } from './store/useAppStore';
 import { useEditorStore } from './store/useEditorStore';
 import { useLintStore } from './store/useLintStore';
@@ -27,6 +28,10 @@ function App() {
     const openFile = useEditorStore(state => state.openFile);
     const updateContent = useEditorStore(state => state.updateContent);
     const markSaved = useEditorStore(state => state.markSaved);
+    const closeTab = useEditorStore(state => state.closeTab);
+    const closeAllTabs = useEditorStore(state => state.closeAllTabs);
+    const setActiveTab = useEditorStore(state => state.setActiveTab);
+    const hydrate = useEditorStore(state => state.hydrate);
 
     const lintEnabled = useLintStore(state => state.enabled);
     const showFindings = useLintStore(state => state.showFindings);
@@ -70,6 +75,10 @@ function App() {
     useEffect(() => {
         window.api.getSettings().then(setSettings);
     }, [setSettings]);
+
+    useEffect(() => {
+        hydrate();
+    }, [hydrate]);
 
     useEffect(() => {
         if (!settings?.spePath) return;
@@ -249,6 +258,13 @@ function App() {
                 />
 
                 <main className="right-panel">
+                    <TabBar
+                        tabs={tabs}
+                        activeTabId={activeTabId}
+                        onSelect={setActiveTab}
+                        onClose={closeTab}
+                        onCloseAll={closeAllTabs}
+                    />
                     <EditorPanel
                         ref={editorRef}
                         file={currentFile}

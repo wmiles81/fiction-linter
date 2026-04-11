@@ -59,9 +59,10 @@ describe('App — lint debounce', () => {
         // Simulate a burst of content changes by re-opening the file with
         // different content. This drives App's `setContent` without
         // poking CodeMirror's contenteditable (unreliable in jsdom).
-        // Scope to the tree-row button: after a file is loaded, the editor
-        // header also renders "story.md", so plain getByText is ambiguous.
-        const treeRow = screen.getByRole('button', { name: /story\.md/ });
+        // Scope via data-path to the tree-row button: after a file is loaded,
+        // the editor header and the tab bar also render "story.md", so plain
+        // getByText / getByRole would be ambiguous.
+        const treeRow = document.querySelector('.tree-row[data-path="/tmp/story.md"]');
         window.api.readFile = async () => ({ ok: true, contents: 'Updated content one.' });
         await act(async () => {
             await user.click(treeRow);

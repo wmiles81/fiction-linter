@@ -7,6 +7,28 @@ const { buildExplainMessages, buildRewriteMessages } = require('./prompts');
 const { getDefaultSpePath: resolveDefaultSpePath } = require('./spePath');
 
 const SETTINGS_FILE = 'settings.json';
+const TABS_FILE = 'tabs.json';
+
+function readTabs() {
+    const tabsPath = path.join(app.getPath('userData'), TABS_FILE);
+    if (!fs.existsSync(tabsPath)) return { tabs: [], activeTabId: null };
+    try {
+        return JSON.parse(fs.readFileSync(tabsPath, 'utf8'));
+    } catch (error) {
+        console.error('readTabs failed:', error);
+        return { tabs: [], activeTabId: null };
+    }
+}
+
+function writeTabs(state) {
+    const tabsPath = path.join(app.getPath('userData'), TABS_FILE);
+    const payload = {
+        tabs: Array.isArray(state?.tabs) ? state.tabs : [],
+        activeTabId: state?.activeTabId ?? null
+    };
+    fs.writeFileSync(tabsPath, JSON.stringify(payload, null, 2), 'utf8');
+    return payload;
+}
 
 function getDefaultSpePath() {
     return resolveDefaultSpePath();
@@ -172,6 +194,10 @@ ipcMain.handle('settings:get', async () => {
 ipcMain.handle('settings:set', async (_event, settings) => {
     return writeSettings(settings || {});
 });
+
+ipcMain.handle('tabs:load', async () => readTabs());
+
+ipcMain.handle('tabs:save', async (_event, state) => writeTabs(state || {}));
 
 const SPE_FILES = [
     { key: 'cliches', name: 'cliche_collider.yaml' },

@@ -20,6 +20,8 @@ if (typeof window !== 'undefined' && !window.api) {
         }),
         saveSettings: async settings => settings,
         loadSpeData: async () => ({ cliches: {}, names: {}, places: {}, protocols: {} }),
-        aiComplete: async () => ({ ok: false, error: 'stub' })
+        aiComplete: async () => ({ ok: false, error: 'stub' }),
+        loadTabs: async () => ({ tabs: [], activeTabId: null }),
+        saveTabs: async state => state
     };
 }

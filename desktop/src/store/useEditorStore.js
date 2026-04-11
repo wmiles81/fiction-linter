@@ -13,7 +13,34 @@ function pickNewActive(tabs, closingId, currentActiveId) {
     return null;
 }
 
-export const useEditorStore = create((set, get) => ({
+function persistNow(state) {
+    if (typeof window === 'undefined' || !window.api?.saveTabs) return;
+    // Save a trimmed version: only the fields we want to persist.
+    const payload = {
+        tabs: state.tabs.map(t => ({
+            id: t.id,
+            path: t.path,
+            name: t.name,
+            markdownSource: t.markdownSource,
+            dirty: t.dirty
+        })),
+        activeTabId: state.activeTabId
+    };
+    window.api.saveTabs(payload).catch(() => { /* best effort */ });
+}
+
+// Zustand middleware: wraps `set` so every mutation writes to userData/tabs.json.
+// The raw `set` from Zustand is replaced with a wrapper that calls persistNow
+// with the post-mutation state — obtained via `get()` which always reads live.
+const withPersist = (config) => (set, get, api) => {
+    const wrappedSet = (partial, replace) => {
+        set(partial, replace);
+        persistNow(get());
+    };
+    return config(wrappedSet, get, api);
+};
+
+export const useEditorStore = create(withPersist((set, get) => ({
     tabs: [],
     activeTabId: null,
 
@@ -106,5 +133,37 @@ export const useEditorStore = create((set, get) => ({
     getActiveTab: () => {
         const { tabs, activeTabId } = get();
         return tabs.find(t => t.id === activeTabId) ?? null;
+    },
+
+    hydrate: async () => {
+        if (typeof window === 'undefined' || !window.api?.loadTabs) return;
+        try {
+            const persisted = await window.api.loadTabs();
+            if (persisted?.tabs?.length) {
+                // Re-read files from disk to get current content — the persisted
+                // markdownSource may be stale if the user edited the file externally.
+                const rehydrated = [];
+                for (const t of persisted.tabs) {
+                    if (!t.path) {
+                        rehydrated.push(t);
+                        continue;
+                    }
+                    const r = await window.api.readFile(t.path);
+                    if (r.ok) {
+                        rehydrated.push({ ...t, markdownSource: r.contents, dirty: false });
+                    }
+                }
+                // Use raw setState (not wrapped) to avoid persisting a rehydration
+                // as a new write.
+                useEditorStore.setState({
+                    tabs: rehydrated,
+                    activeTabId: rehydrated.some(t => t.id === persisted.activeTabId)
+                        ? persisted.activeTabId
+                        : (rehydrated[0]?.id ?? null)
+                });
+            }
+        } catch (err) {
+            console.error('Tab hydration failed:', err);
+        }
     }
-}));
+})));
