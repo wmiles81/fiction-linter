@@ -156,13 +156,24 @@ function App() {
         }
 
         const handle = setTimeout(() => {
+            // Lint against the editor's PLAIN TEXT representation (the same
+            // string lintOverlay uses for offset mapping), NOT the markdown
+            // source. Markdown syntax markers (**, #, etc.) shift offsets
+            // relative to the rendered text — feeding markdown offsets into
+            // the DOM-based highlight overlay produces wrong-position
+            // highlights and crashes the Range API on out-of-bounds offsets.
+            //
+            // Falls back to `content` (the markdown) if the editor is not
+            // mounted yet — only matters on the very first lint cycle.
+            const lintInput = editorRef.current?.getPlainText?.() || content;
+
             const findings = [
-                ...patternCore.lintText(content, speData),
-                ...nameCore.lintText(content, speData)
+                ...patternCore.lintText(lintInput, speData),
+                ...nameCore.lintText(lintInput, speData)
             ];
 
             const mapped = findings.map(finding => {
-                const loc = indexToLineCol(content, finding.start);
+                const loc = indexToLineCol(lintInput, finding.start);
                 return {
                     ...finding,
                     line: loc.line,
@@ -241,8 +252,15 @@ function App() {
         // Extract the surrounding sentence for the finding. A "sentence" here is
         // a simple heuristic: from the previous sentence terminator (., !, ?, \n)
         // to the next one. Good enough for an AI prompt.
-        const before = content.slice(0, issue.start);
-        const after = content.slice(issue.end);
+        //
+        // IMPORTANT: use the editor's plain-text representation, not the
+        // markdown source, because finding.start/.end are now in plain-text
+        // coordinates (matching the lint pipeline). Falls back to `content`
+        // (markdown) if the editor is not mounted yet.
+        const sourceText = editorRef.current?.getPlainText?.() || content;
+        if (!sourceText) return '';
+        const before = sourceText.slice(0, issue.start);
+        const after = sourceText.slice(issue.end);
 
         const prevBreak = Math.max(
             before.lastIndexOf('. '),
@@ -262,7 +280,7 @@ function App() {
 
         const startIdx = prevBreak === -1 ? 0 : prevBreak + 2;
         const endIdx = issue.end + nextBreak + 1;
-        return content.slice(startIdx, Math.min(endIdx, content.length)).trim();
+        return sourceText.slice(startIdx, Math.min(endIdx, sourceText.length)).trim();
     };
 
     const visibleIssues = showFindings ? issues : [];

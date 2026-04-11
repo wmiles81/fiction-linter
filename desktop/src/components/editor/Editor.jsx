@@ -164,7 +164,16 @@ const Editor = forwardRef(function Editor({
         handleInput();
     }, [handleInput]);
 
-    // Expose imperative jumpTo for click-to-issue
+    // Expose imperative methods.
+    //
+    // - jumpTo(issue): scroll/select the range corresponding to a finding
+    // - getPlainText(): return the editor's plain-text representation
+    //   (the same string lintOverlay uses for offset mapping). The lint
+    //   pipeline must lint THIS string, not the markdown source — markdown
+    //   syntax markers (**, #, etc.) shift offsets vs the rendered text,
+    //   and feeding markdown offsets into the DOM-based highlight overlay
+    //   produces wrong-position highlights and (in the worst case) crashes
+    //   the Range API on out-of-bounds offsets.
     useImperativeHandle(ref, () => ({
         jumpTo(issue) {
             if (!editorRef.current) return;
@@ -189,6 +198,10 @@ const Editor = forwardRef(function Editor({
                 // jsdom / getBoundingClientRect may throw; non-fatal.
             }
             editorRef.current.focus();
+        },
+        getPlainText() {
+            if (!editorRef.current) return '';
+            return buildOffsetMap(editorRef.current).text;
         }
     }));
 

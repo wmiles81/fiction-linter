@@ -85,37 +85,81 @@ export function buildOffsetMap(root) {
 /**
  * Build a DOM Range from a pair of plain-text offsets using the map.
  * Returns null if the map is empty or no textual content exists.
+ *
+ * Defensive against offset/coordinate-system mismatches: clamps both the
+ * global offsets (to the map's overall text range) AND the local offsets
+ * (to each entry's node length) so a Range is always valid even if the
+ * caller is using a different coordinate system than the map was built
+ * from. Without the local clamp, an offset that fell into a synthetic
+ * separator region (between text-node entries) would land on the wrong
+ * entry and produce a negative local offset, which the DOM Range API
+ * silently coerces to a huge unsigned int and then rejects.
  */
 export function rangeFromOffsets(map, start, end) {
     if (map.length === 0) return null;
 
-    // Clamp
+    // Global clamp: keep offsets inside the map's overall text range.
     const lastEnd = map[map.length - 1].endInText;
     start = Math.max(0, Math.min(start, lastEnd));
     end = Math.max(start, Math.min(end, lastEnd));
 
-    const startEntry = findEntryContaining(map, start);
-    const endEntry = findEntryContaining(map, end);
+    const startEntry = findNearestEntry(map, start);
+    const endEntry = findNearestEntry(map, end);
     if (!startEntry || !endEntry) return null;
 
-    const range = document.createRange();
-    range.setStart(startEntry.node, start - startEntry.startInText);
-    range.setEnd(endEntry.node, end - endEntry.startInText);
-    return range;
+    // Local clamp: pin the offset within each entry's text node length.
+    // node.textContent.length is the canonical "valid offset upper bound"
+    // for a Text node. Negative values get clamped to 0; values past the
+    // end get clamped to the node length.
+    const startNodeLen = startEntry.node.textContent?.length ?? 0;
+    const endNodeLen = endEntry.node.textContent?.length ?? 0;
+    const startLocal = Math.max(0, Math.min(start - startEntry.startInText, startNodeLen));
+    const endLocal = Math.max(0, Math.min(end - endEntry.startInText, endNodeLen));
+
+    try {
+        const range = document.createRange();
+        range.setStart(startEntry.node, startLocal);
+        range.setEnd(endEntry.node, endLocal);
+        return range;
+    } catch {
+        // If the Range API still rejects (e.g., end before start across nodes),
+        // return null rather than crashing the whole highlight pass.
+        return null;
+    }
 }
 
-function findEntryContaining(map, offset) {
+/**
+ * Find the entry whose text-node range contains the given offset, falling
+ * back to the entry whose range is nearest the offset (by absolute distance).
+ *
+ * The fallback matters when the offset lands in a "synthetic" text region
+ * — the `\n\n` separators inserted between block elements, or the `---`
+ * synthesized for an HR — because those regions don't have backing text
+ * nodes. Returning the nearest text node (and letting rangeFromOffsets
+ * locally clamp the offset) gives a valid Range at the right approximate
+ * position rather than throwing.
+ */
+function findNearestEntry(map, offset) {
+    let containing = null;
+    let nearest = null;
+    let nearestDist = Infinity;
+
     for (const entry of map) {
         if (entry.isSynthetic) continue;
         if (offset >= entry.startInText && offset <= entry.endInText) {
-            return entry;
+            containing = entry;
+            break;
+        }
+        const dist = offset < entry.startInText
+            ? entry.startInText - offset
+            : offset - entry.endInText;
+        if (dist < nearestDist) {
+            nearestDist = dist;
+            nearest = entry;
         }
     }
-    // If we fell off the end, return the last non-synthetic entry
-    for (let i = map.length - 1; i >= 0; i--) {
-        if (!map[i].isSynthetic) return map[i];
-    }
-    return null;
+
+    return containing || nearest;
 }
 
 /**
