@@ -4,6 +4,7 @@ import FileTree from './components/FileTree';
 import EditorPanel from './components/EditorPanel';
 import SettingsDialog from './components/SettingsDialog';
 import IssueList from './components/IssueList';
+import PanelResizer from './components/PanelResizer';
 
 const emptyData = {
     cliches: {},
@@ -23,6 +24,18 @@ function App() {
     const [issues, setIssues] = useState([]);
     const [showSettings, setShowSettings] = useState(false);
     const [status, setStatus] = useState('Ready');
+    const [leftPanelWidth, setLeftPanelWidth] = React.useState(() => {
+        if (typeof window === 'undefined') return 260;
+        const stored = window.localStorage.getItem('fl.leftPanelWidth');
+        return stored ? Math.max(160, parseInt(stored, 10)) : 260;
+    });
+
+    const handleResize = (newWidth) => {
+        setLeftPanelWidth(newWidth);
+        try {
+            window.localStorage.setItem('fl.leftPanelWidth', String(newWidth));
+        } catch { /* quota, private mode, etc. — non-fatal */ }
+    };
 
     const editorRef = useRef(null);
 
@@ -162,9 +175,6 @@ function App() {
                     <span className="brand-tag">Desktop Studio</span>
                 </div>
                 <div className="top-actions">
-                    <button className="ghost-button" onClick={handleChooseFolder}>
-                        Open Folder
-                    </button>
                     <button
                         className="icon-button"
                         onClick={() => setShowSettings(true)}
@@ -182,10 +192,20 @@ function App() {
             </header>
 
             <div className="workspace">
-                <aside className="left-panel">
+                <aside className="left-panel" style={{ width: `${leftPanelWidth}px` }}>
                     <div className="panel-header">
-                        <span>Files</span>
-                        {rootPath ? <span className="path-pill">{rootPath}</span> : null}
+                        <div className="panel-header-title">
+                            <span>Files</span>
+                            {rootPath ? <span className="path-pill">{rootPath}</span> : null}
+                        </div>
+                        <button
+                            className="panel-header-action"
+                            onClick={handleChooseFolder}
+                            title="Open folder"
+                            aria-label="Open folder"
+                        >
+                            Open
+                        </button>
                     </div>
                     <FileTree
                         nodes={tree}
@@ -194,6 +214,12 @@ function App() {
                         selectedPath={currentFile?.path}
                     />
                 </aside>
+                <PanelResizer
+                    currentWidth={leftPanelWidth}
+                    onResize={handleResize}
+                    minWidth={160}
+                    maxWidth={typeof window !== 'undefined' ? Math.floor(window.innerWidth * 0.5) : 800}
+                />
 
                 <main className="right-panel">
                     <EditorPanel

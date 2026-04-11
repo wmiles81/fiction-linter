@@ -1,4 +1,5 @@
 import React from 'react';
+import { isFileEligible } from '../lib/fileEligibility';
 
 function FileTree({ nodes, onToggle, onSelect, selectedPath }) {
     if (!nodes.length) {
@@ -28,13 +29,27 @@ function FileTree({ nodes, onToggle, onSelect, selectedPath }) {
 function TreeNode({ node, onToggle, onSelect, selectedPath, depth }) {
     const isSelected = selectedPath === node.path;
     const indent = { paddingLeft: `${depth * 16 + 12}px` };
+    const eligible = node.isDirectory || isFileEligible(node.name);
+    const disabled = !eligible && !node.isDirectory;
+
+    const handleClick = () => {
+        if (disabled) return;
+        if (node.isDirectory) {
+            onToggle(node.path);
+        } else {
+            onSelect(node);
+        }
+    };
 
     return (
         <div className="tree-node">
             <button
-                className={`tree-row ${isSelected ? 'selected' : ''}`}
+                className={`tree-row ${isSelected ? 'selected' : ''} ${disabled ? 'disabled' : ''}`}
                 style={indent}
-                onClick={() => (node.isDirectory ? onToggle(node.path) : onSelect(node))}
+                onClick={handleClick}
+                disabled={disabled}
+                data-path={node.path}
+                title={disabled ? 'File type not supported for editing' : node.path}
             >
                 <span className="tree-icon">
                     {node.isDirectory ? (node.expanded ? '▾' : '▸') : '•'}

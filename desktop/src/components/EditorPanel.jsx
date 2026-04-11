@@ -15,10 +15,13 @@ const editorTheme = EditorView.theme({
     },
     '.cm-scroller': {
         fontFamily: '"Fraunces", Georgia, serif',
-        lineHeight: '1.6'
+        lineHeight: '1.4'
     },
     '.cm-content': {
-        padding: '24px 20px'
+        padding: '16px 20px'
+    },
+    '.cm-line': {
+        padding: '0'
     }
 });
 
@@ -74,7 +77,7 @@ const EditorPanel = forwardRef(function EditorPanel(
                     value={content}
                     onChange={onChange}
                     onCreateEditor={handleCreateEditor}
-                    extensions={[markdown(), editorTheme, ...lintBridgeExtensions]}
+                    extensions={[markdown(), editorTheme, EditorView.lineWrapping, ...lintBridgeExtensions]}
                     basicSetup={{
                         lineNumbers: true,
                         foldGutter: false,

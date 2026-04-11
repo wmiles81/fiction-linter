@@ -21,6 +21,7 @@ body {
     font-family: 'Space Grotesk', system-ui, sans-serif;
     background: radial-gradient(circle at top left, var(--bg-2), var(--bg-1) 55%, #fbe9dd 100%);
     color: var(--ink);
+    line-height: 1.35;
 }
 
 .app-shell {
@@ -40,6 +41,7 @@ body {
     font-family: 'Fraunces', serif;
     font-size: 26px;
     letter-spacing: 0.5px;
+    line-height: 1.1;
 }
 
 .brand-tag {
@@ -51,6 +53,7 @@ body {
     color: #8e2f1d;
     font-weight: 600;
     font-size: 12px;
+    line-height: 1.1;
 }
 
 .top-actions {
@@ -120,11 +123,11 @@ body {
 }
 
 .workspace {
-    display: grid;
-    grid-template-columns: 300px 1fr;
+    display: flex;
     gap: 18px;
     padding: 0 24px 24px;
     flex: 1;
+    min-height: 0;
 }
 
 .left-panel {
@@ -136,25 +139,78 @@ body {
     animation: panelIn 0.5s ease;
     display: flex;
     flex-direction: column;
+    flex-shrink: 0;
+    min-height: 0;
+    min-width: 0;
+    overflow: hidden;
+    /* `width` is set inline from state */
 }
 
 .right-panel {
     display: grid;
     grid-template-rows: 1fr auto;
     gap: 16px;
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
 }
 
 .panel-header {
     display: flex;
-    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
     gap: 8px;
+    padding: 8px 12px;
     font-weight: 600;
+    line-height: 1.2;
+}
+
+.panel-header-title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    flex: 1;
+}
+
+.panel-header-action {
+    background: transparent;
+    border: 1px solid var(--g-border, #d7d2c5);
+    color: var(--g-text, #2a2620);
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    white-space: nowrap;
+    font-family: inherit;
+}
+
+.panel-header-action:hover {
+    background: var(--g-surface-hover, rgba(0, 0, 0, 0.04));
 }
 
 .path-pill {
     font-size: 12px;
     color: var(--muted);
     word-break: break-all;
+}
+
+.panel-resizer {
+    width: 4px;
+    flex-shrink: 0;
+    background: transparent;
+    cursor: col-resize;
+    transition: background 100ms ease;
+    margin-left: -2px;
+    margin-right: -2px;
+    position: relative;
+    z-index: 1;
+}
+
+.panel-resizer:hover {
+    background: var(--g-accent, #4a7a4a);
+    opacity: 0.4;
 }
 
 .empty-tree {
@@ -164,8 +220,11 @@ body {
 }
 
 .tree-root {
+    flex: 1;
     margin-top: 16px;
+    min-height: 0;
     overflow-y: auto;
+    overflow-x: hidden;
     padding-right: 4px;
 }
 
@@ -174,14 +233,16 @@ body {
     background: transparent;
     border: none;
     text-align: left;
-    padding: 6px 8px;
+    padding: 3px 0;
     display: flex;
     gap: 8px;
     align-items: center;
     font-size: 14px;
+    line-height: 1.2;
     border-radius: 8px;
     color: var(--ink);
     cursor: pointer;
+    font-family: inherit;
 }
 
 .tree-row:hover {
@@ -191,6 +252,16 @@ body {
 .tree-row.selected {
     background: #ffe3d5;
     font-weight: 600;
+}
+
+.tree-row.disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    font-style: italic;
+}
+
+.tree-row.disabled:hover {
+    background: transparent;
 }
 
 .tree-icon {
@@ -268,6 +339,7 @@ body {
     padding: 12px 14px;
     background: #fff;
     border: 1px solid var(--border);
+    line-height: 1.3;
 }
 
 .issue-card.error {
@@ -295,6 +367,7 @@ body {
 .issue-message {
     margin-top: 6px;
     font-size: 14px;
+    line-height: 1.3;
 }
 
 .status-bar {
@@ -321,6 +394,7 @@ body {
     border-radius: 20px;
     box-shadow: var(--shadow);
     animation: riseFade 0.3s ease;
+    line-height: 1.2;
 }
 
 .modal-card h2 {
@@ -332,6 +406,15 @@ body {
     display: grid;
     gap: 10px;
     margin-top: 16px;
+    margin-bottom: 12px;
+}
+
+.modal-section label {
+    display: block;
+    margin-bottom: 4px;
+    line-height: 1.2;
+    font-size: 12px;
+    font-weight: 600;
 }
 
 .modal-section input {
@@ -372,7 +455,7 @@ body {
 
 @media (max-width: 960px) {
     .workspace {
-        grid-template-columns: 1fr;
+        flex-direction: column;
     }
 }
 
@@ -391,6 +474,10 @@ body {
 
 .editor-surface .cm-editor.cm-focused {
     outline: none;
+}
+
+.editor-surface .cm-scroller {
+    line-height: 1.2;
 }
 
 .issue-actions {
@@ -419,6 +506,7 @@ body {
 .ai-body {
     font-family: inherit;
     font-size: 13px;
+    line-height: 1.3;
     white-space: pre-wrap;
     margin: 0;
 }
