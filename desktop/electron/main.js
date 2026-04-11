@@ -35,12 +35,18 @@ function isGoogleLoginPage(body) {
 //   { ok: true, body, contentType, status }       on successful fetch
 //   { ok: false, kind: 'auth-required', reason }  on 401/403/login page
 //   { ok: false, error }                          on network/other failures
+//
+// Uses `partition: GOOGLE_AUTH_PARTITION` (a string) instead of
+// `session: <Session>` (an object). Both are valid Electron APIs but the
+// string variant has fewer lifecycle gotchas — passing a Session object
+// can null-pointer-crash the main process when the object's lifetime gets
+// tangled with the request lifecycle.
 function fetchWithGoogleSession(url) {
     return new Promise((resolve) => {
         const request = net.request({
             method: 'GET',
             url,
-            session: getGoogleSession(),
+            partition: GOOGLE_AUTH_PARTITION,
             useSessionCookies: true,
             redirect: 'follow'
         });
@@ -380,57 +386,105 @@ ipcMain.handle('fs:readGdoc', async (_event, filePath) => {
     return { ok: false, error: result.error || 'gdoc fetch failed' };
 });
 
-// Open an interactive Google sign-in window. Uses the same persist:google-auth
-// session partition that fs:readGdoc fetches with — so cookies set during
-// sign-in are automatically used by subsequent fetches. No OAuth client_id
-// or Google Cloud project required: we are simply driving Google's normal
-// browser-based sign-in flow inside an embedded BrowserWindow.
+// Open an interactive Google sign-in window. Uses the persist:google-auth
+// partition that fs:readGdoc fetches with — so cookies set during sign-in
+// are automatically used by subsequent fetches. No OAuth client_id or
+// Google Cloud project required: we drive Google's normal browser-based
+// sign-in flow inside an embedded BrowserWindow.
 //
 // Resolves with { ok: true } when sign-in completes (detected by navigation
-// to docs.google.com), or { ok: false, error } if the user closes the window.
+// to docs.google.com), or { ok: false, error } if the user closes the window
+// or any step fails. Wrapped in try/catch so a BrowserWindow construction
+// failure cannot crash the main process — returns an error instead.
 ipcMain.handle('gdoc:auth', async () => {
     return new Promise((resolve) => {
-        const authSession = getGoogleSession();
-        const authWindow = new BrowserWindow({
-            width: 500,
-            height: 700,
-            title: 'Sign in to Google',
-            show: true,
-            webPreferences: {
-                session: authSession,
-                contextIsolation: true,
-                nodeIntegration: false,
-                sandbox: true
-            }
-        });
-        authWindow.webContents.setUserAgent(GOOGLE_USER_AGENT);
-
+        let authWindow = null;
         let resolved = false;
+
+        const safeClose = () => {
+            if (!authWindow) return;
+            try {
+                if (!authWindow.isDestroyed()) {
+                    authWindow.close();
+                }
+            } catch {
+                // Window already gone — ignore.
+            }
+        };
+
         const finish = (result) => {
             if (resolved) return;
             resolved = true;
-            if (!authWindow.isDestroyed()) {
-                authWindow.close();
-            }
+            // Close the window if it's still alive. Do NOT call close() from
+            // inside the 'closed' event handler — the native object is in
+            // teardown and isDestroyed() may briefly lie.
+            if (result && result.ok) safeClose();
             resolve(result);
         };
 
+        try {
+            authWindow = new BrowserWindow({
+                width: 500,
+                height: 700,
+                title: 'Sign in to Google',
+                show: true,
+                webPreferences: {
+                    // Use the partition STRING, not a Session object. The string
+                    // form is the documented and well-tested API; passing a
+                    // Session object has caused null-pointer crashes in the
+                    // main process under sandbox + custom-session combinations.
+                    partition: GOOGLE_AUTH_PARTITION,
+                    contextIsolation: true,
+                    nodeIntegration: false,
+                    sandbox: true
+                }
+            });
+        } catch (err) {
+            finish({ ok: false, error: `Failed to open sign-in window: ${err.message}` });
+            return;
+        }
+
+        try {
+            authWindow.webContents.setUserAgent(GOOGLE_USER_AGENT);
+        } catch {
+            // Non-fatal; default Electron UA still works for Google.
+        }
+
         // Watch for navigation to docs.google.com — that's our signal that
         // sign-in completed (Google's `continue=` parameter brings us there).
+        // Each handler defensively checks isDestroyed because navigation
+        // events can fire concurrently with window teardown.
         const handleNav = (_event, url) => {
+            if (resolved || !authWindow || authWindow.isDestroyed()) return;
             if (url && url.startsWith('https://docs.google.com')) {
                 finish({ ok: true });
             }
         };
-        authWindow.webContents.on('did-navigate', handleNav);
-        authWindow.webContents.on('did-redirect-navigation', handleNav);
-        authWindow.webContents.on('did-navigate-in-page', handleNav);
 
+        try {
+            authWindow.webContents.on('did-navigate', handleNav);
+            authWindow.webContents.on('did-redirect-navigation', handleNav);
+            authWindow.webContents.on('did-navigate-in-page', handleNav);
+        } catch (err) {
+            finish({ ok: false, error: `Failed to attach navigation listeners: ${err.message}` });
+            return;
+        }
+
+        // The 'closed' event fires when the user closes the window OR after
+        // we close it ourselves via finish({ok:true}). Only treat it as a
+        // user cancellation if we have not already resolved.
         authWindow.on('closed', () => {
-            finish({ ok: false, error: 'Sign-in window was closed before authentication completed.' });
+            if (!resolved) {
+                resolved = true;
+                resolve({ ok: false, error: 'Sign-in window was closed before authentication completed.' });
+            }
         });
 
-        authWindow.loadURL('https://accounts.google.com/ServiceLogin?continue=https://docs.google.com');
+        try {
+            authWindow.loadURL('https://accounts.google.com/ServiceLogin?continue=https://docs.google.com');
+        } catch (err) {
+            finish({ ok: false, error: `Failed to load sign-in URL: ${err.message}` });
+        }
     });
 });
 
