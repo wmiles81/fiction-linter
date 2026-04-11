@@ -9,6 +9,11 @@ export default defineConfig({
             '@shared': path.resolve(__dirname, '../src/shared')
         }
     },
+    server: {
+        fs: {
+            allow: ['..']
+        }
+    },
     test: {
         environment: 'jsdom',
         globals: true,
