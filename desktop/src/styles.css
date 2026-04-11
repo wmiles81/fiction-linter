@@ -161,7 +161,10 @@ body {
 
 .right-panel {
     display: grid;
-    grid-template-rows: auto 1fr auto;
+    /* TabBar (auto) + Editor (1fr). The IssueList row was removed when
+     * lint warnings moved from a separate sidebar to inline hover tooltips
+     * on the editor surface. */
+    grid-template-rows: auto 1fr;
     gap: 16px;
     flex: 1;
     min-width: 0;
@@ -832,6 +835,40 @@ body {
 .editor-surface:not(.wrap) {
     white-space: pre;
     overflow-x: auto;
+}
+
+/* Inline lint warning tooltip — appears on hover over a highlighted finding.
+ * Position is set inline (viewport-relative pixel coordinates from a
+ * mousemove handler in Editor.jsx). pointer-events: none so the tooltip
+ * never blocks clicks on the underlying text. */
+.lint-tooltip {
+    position: fixed;
+    z-index: 1000;
+    max-width: 360px;
+    padding: 8px 12px;
+    background: rgba(28, 27, 25, 0.94);
+    color: #fff;
+    font-size: 12px;
+    line-height: 1.4;
+    border-radius: 6px;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
+    pointer-events: none;
+    /* Wrap long messages instead of escaping the viewport horizontally. */
+    white-space: normal;
+    word-wrap: break-word;
+    border-left: 3px solid #888;
+}
+
+.lint-tooltip.error {
+    border-left-color: #c44;
+}
+
+.lint-tooltip.warning {
+    border-left-color: #c80;
+}
+
+.lint-tooltip.info {
+    border-left-color: #48a;
 }
 
 .editor-surface h1 {

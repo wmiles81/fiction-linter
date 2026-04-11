@@ -1,7 +1,22 @@
-import React, { forwardRef, useEffect, useImperativeHandle, useRef, useCallback } from 'react';
+import React, { forwardRef, useEffect, useImperativeHandle, useRef, useCallback, useState } from 'react';
 import EditorToolbar from './EditorToolbar';
 import { markdownToHtml, htmlToMarkdown, sanitizeHtml } from './converters';
 import { applyLintHighlights, buildOffsetMap, rangeFromOffsets } from './lintOverlay';
+
+/**
+ * Pure helper: given a list of findings and a plain-text offset, return
+ * the first finding whose range contains the offset, or null. Exported
+ * so the hover-tooltip lookup logic is testable in isolation (jsdom does
+ * not implement caretRangeFromPoint, so we cannot easily integration-test
+ * the full DOM-coordinate path).
+ */
+export function findingAtOffset(issues, offset) {
+    if (!issues || issues.length === 0) return null;
+    for (const issue of issues) {
+        if (offset >= issue.start && offset <= issue.end) return issue;
+    }
+    return null;
+}
 
 /**
  * The Editor is a self-contained WYSIWYG markdown editor. It owns a
@@ -26,6 +41,14 @@ const Editor = forwardRef(function Editor({
     // Track the last markdown we emitted so we can ignore the re-entry
     // that happens when the parent echoes value back.
     const lastEmittedRef = useRef(null);
+
+    // Hover-tooltip state for inline lint warnings.
+    // hoverFinding is the finding currently under the cursor (or null).
+    // tooltipPos is the viewport-relative position to render the tooltip.
+    // hoverRafRef throttles mousemove lookups to once per animation frame.
+    const [hoverFinding, setHoverFinding] = useState(null);
+    const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
+    const hoverRafRef = useRef(null);
 
     // Sync external value (markdown) into the contenteditable as HTML
     useEffect(() => {
@@ -119,6 +142,57 @@ const Editor = forwardRef(function Editor({
         document.addEventListener('selectionchange', handleSelectionChange);
         return () => document.removeEventListener('selectionchange', handleSelectionChange);
     }, [handleSelectionChange]);
+
+    // Hover-tooltip lookup: convert mouse coordinates back into a plain-text
+    // offset and check whether any finding's range contains it. Throttled to
+    // once per animation frame to keep mousemove cheap (caret lookups + map
+    // builds + finding scans on every pixel of cursor travel would burn cycles).
+    const handleMouseMove = useCallback((e) => {
+        if (!showFindings) return;
+        if (!editorRef.current) return;
+        if (hoverRafRef.current !== null) return;
+        // Pull coordinates out before the rAF callback (defensive against
+        // any future SyntheticEvent pooling, though React 17+ does not pool).
+        const clientX = e.clientX;
+        const clientY = e.clientY;
+        hoverRafRef.current = requestAnimationFrame(() => {
+            hoverRafRef.current = null;
+            if (!editorRef.current) return;
+            // caretRangeFromPoint is the WebKit/Blink API. Firefox uses
+            // caretPositionFromPoint with a different return shape — we are
+            // in Electron (Chromium) so caretRangeFromPoint is correct.
+            const caretRange = document.caretRangeFromPoint?.(clientX, clientY);
+            if (!caretRange || !editorRef.current.contains(caretRange.startContainer)) {
+                setHoverFinding(null);
+                return;
+            }
+            const { map } = buildOffsetMap(editorRef.current);
+            const offset = offsetForNode(map, caretRange.startContainer, caretRange.startOffset);
+            const finding = findingAtOffset(issues, offset);
+            if (finding) {
+                setHoverFinding(finding);
+                // Offset the tooltip slightly down-and-right of the cursor so
+                // it does not obscure the text being hovered.
+                setTooltipPos({ x: clientX + 14, y: clientY + 18 });
+            } else {
+                setHoverFinding(null);
+            }
+        });
+    }, [showFindings, issues]);
+
+    const handleMouseLeave = useCallback(() => {
+        if (hoverRafRef.current !== null) {
+            cancelAnimationFrame(hoverRafRef.current);
+            hoverRafRef.current = null;
+        }
+        setHoverFinding(null);
+    }, []);
+
+    // Hide the tooltip if showFindings flips to false while we're hovering
+    // (toggling from Findings to Silent in the status bar mid-hover).
+    useEffect(() => {
+        if (!showFindings) setHoverFinding(null);
+    }, [showFindings]);
 
     // Apply lint highlights whenever issues change
     useEffect(() => {
@@ -223,8 +297,19 @@ const Editor = forwardRef(function Editor({
                 suppressContentEditableWarning
                 onInput={handleInput}
                 onPaste={handlePaste}
+                onMouseMove={handleMouseMove}
+                onMouseLeave={handleMouseLeave}
                 spellCheck={false}
             />
+            {hoverFinding ? (
+                <div
+                    className={`lint-tooltip ${hoverFinding.severity || 'info'}`}
+                    style={{ left: `${tooltipPos.x}px`, top: `${tooltipPos.y}px` }}
+                    role="tooltip"
+                >
+                    {hoverFinding.message}
+                </div>
+            ) : null}
         </section>
     );
 });

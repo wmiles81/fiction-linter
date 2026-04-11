@@ -3,7 +3,6 @@ import { PatternLinterCore, NameValidatorCore } from '@shared/linting';
 import FileTree from './components/FileTree';
 import Editor from './components/editor/Editor';
 import SettingsDialog from './components/SettingsDialog';
-import IssueList from './components/IssueList';
 import PanelResizer from './components/PanelResizer';
 import TabBar from './components/TabBar';
 import StatusBar from './components/StatusBar';
@@ -244,44 +243,12 @@ function App() {
         setShowSettings(false);
     };
 
-    const handleJumpToIssue = issue => {
-        editorRef.current?.jumpTo(issue);
-    };
-
-    const getSnippet = issue => {
-        // Extract the surrounding sentence for the finding. A "sentence" here is
-        // a simple heuristic: from the previous sentence terminator (., !, ?, \n)
-        // to the next one. Good enough for an AI prompt.
-        //
-        // IMPORTANT: use the editor's plain-text representation, not the
-        // markdown source, because finding.start/.end are now in plain-text
-        // coordinates (matching the lint pipeline). Falls back to `content`
-        // (markdown) if the editor is not mounted yet.
-        const sourceText = editorRef.current?.getPlainText?.() || content;
-        if (!sourceText) return '';
-        const before = sourceText.slice(0, issue.start);
-        const after = sourceText.slice(issue.end);
-
-        const prevBreak = Math.max(
-            before.lastIndexOf('. '),
-            before.lastIndexOf('! '),
-            before.lastIndexOf('? '),
-            before.lastIndexOf('\n')
-        );
-        const nextBreak = (() => {
-            const candidates = [
-                after.indexOf('. '),
-                after.indexOf('! '),
-                after.indexOf('? '),
-                after.indexOf('\n')
-            ].filter(i => i !== -1);
-            return candidates.length ? Math.min(...candidates) : after.length;
-        })();
-
-        const startIdx = prevBreak === -1 ? 0 : prevBreak + 2;
-        const endIdx = issue.end + nextBreak + 1;
-        return sourceText.slice(startIdx, Math.min(endIdx, sourceText.length)).trim();
-    };
+    // Note: handleJumpToIssue and getSnippet were removed when the IssueList
+    // sidebar was retired in favor of inline hover tooltips on the editor.
+    // If AI Explain/Suggest rewrite features come back (e.g., via a pinned
+    // tooltip with action buttons), restore both helpers — getSnippet should
+    // use editorRef.current.getPlainText() for the source text since findings
+    // are in plain-text coordinates, not markdown coordinates.
 
     const visibleIssues = showFindings ? issues : [];
 
@@ -357,11 +324,6 @@ function App() {
                         onStateChange={setEditorState}
                         wrap={wrap}
                         onToggleWrap={() => setWrap(w => !w)}
-                    />
-                    <IssueList
-                        issues={visibleIssues}
-                        onJump={handleJumpToIssue}
-                        getSnippet={getSnippet}
                     />
                 </main>
             </div>
