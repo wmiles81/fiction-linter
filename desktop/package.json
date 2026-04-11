@@ -1,0 +1,22 @@
+{
+  "name": "fiction-linter-desktop",
+  "version": "0.0.1",
+  "private": true,
+  "main": "electron/main.js",
+  "scripts": {
+    "dev": "VITE_DEV_SERVER_URL=http://localhost:5173 concurrently \"vite\" \"electron .\"",
+    "build": "vite build",
+    "start": "electron ."
+  },
+  "dependencies": {
+    "electron": "^31.3.0",
+    "js-yaml": "^4.1.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.1",
+    "concurrently": "^9.0.1",
+    "vite": "^5.4.3"
+  }
+}
