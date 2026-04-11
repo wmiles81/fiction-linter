@@ -5,14 +5,24 @@
  * in the tree but rendered as disabled so the user sees them without being
  * able to click them.
  *
- * To add a new eligible extension (e.g., '.docx' when import lands):
- * push it into ELIGIBLE_EXTENSIONS.
+ * Different eligible extensions take different open paths in App.handleSelectFile:
+ *   - .md / .markdown / .txt → read as UTF-8 text, open as a tab with the file path
+ *   - .docx → read as binary, run through mammoth → HTML → htmlToMarkdown,
+ *             open as a tab with a sibling `.md` path so save writes to .md
+ *             without overwriting the original .docx
+ *   - .gdoc → read JSON pointer, extract URL, open in default browser via
+ *             shell.openExternal (no actual content available offline)
+ *
+ * `getFileKind(fileName)` returns the routing tag so the App layer can
+ * dispatch on it without re-implementing extension matching.
  */
 
 export const ELIGIBLE_EXTENSIONS = new Set([
     '.md',
     '.markdown',
-    '.txt'
+    '.txt',
+    '.docx',
+    '.gdoc'
 ]);
 
 export function isFileEligible(fileName) {
@@ -21,4 +31,23 @@ export function isFileEligible(fileName) {
     if (dot === -1) return false;
     const ext = fileName.slice(dot).toLowerCase();
     return ELIGIBLE_EXTENSIONS.has(ext);
+}
+
+/**
+ * Returns one of: 'text' | 'docx' | 'gdoc' | null
+ *
+ * - 'text': plain text file (markdown, txt) — read as UTF-8 via fs:readFile
+ * - 'docx': Word document — read as binary via fs:readDocx, convert via mammoth
+ * - 'gdoc': Google Docs pointer file — read via fs:readGdoc, open URL externally
+ * - null:   not openable
+ */
+export function getFileKind(fileName) {
+    if (!fileName) return null;
+    const dot = fileName.lastIndexOf('.');
+    if (dot === -1) return null;
+    const ext = fileName.slice(dot).toLowerCase();
+    if (ext === '.docx') return 'docx';
+    if (ext === '.gdoc') return 'gdoc';
+    if (ext === '.md' || ext === '.markdown' || ext === '.txt') return 'text';
+    return null;
 }

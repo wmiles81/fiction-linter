@@ -1,7 +1,8 @@
-const { app, BrowserWindow, ipcMain, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const yaml = require('js-yaml');
+const mammoth = require('mammoth');
 const { callChatCompletion } = require('./aiClient');
 const { fetchModels } = require('./modelCatalog');
 const { buildExplainMessages, buildRewriteMessages } = require('./prompts');
@@ -188,6 +189,76 @@ ipcMain.handle('fs:writeFile', async (_event, payload) => {
 
     try {
         fs.writeFileSync(payload.filePath, payload.contents ?? '', 'utf8');
+        return { ok: true };
+    } catch (error) {
+        return { ok: false, error: error.message };
+    }
+});
+
+// Read a .docx file as binary, run mammoth to convert to HTML. The renderer
+// then converts that HTML to markdown via the existing editor/converters.js
+// `htmlToMarkdown` (the same pipeline as paste handling), so .docx import
+// uses the same code path as gdoc paste — consistent results.
+//
+// Returns { ok, html, messages } on success or { ok: false, error } on failure.
+// `messages` is mammoth's array of conversion warnings (e.g., unsupported
+// styles); we surface them so the renderer can show a status note if any.
+ipcMain.handle('fs:readDocx', async (_event, filePath) => {
+    if (!filePath || !fs.existsSync(filePath)) {
+        return { ok: false, error: 'File not found.' };
+    }
+    try {
+        const buffer = fs.readFileSync(filePath);
+        const result = await mammoth.convertToHtml({ buffer });
+        return {
+            ok: true,
+            html: result.value || '',
+            messages: (result.messages || []).map(m => ({ type: m.type, message: m.message }))
+        };
+    } catch (error) {
+        return { ok: false, error: `mammoth conversion failed: ${error.message}` };
+    }
+});
+
+// Read a .gdoc pointer file. .gdoc files on disk are tiny JSON pointers to
+// cloud documents — they have no actual content. Returns the URL so the
+// renderer can hand it off to shell:openExternal. We do NOT attempt to fetch
+// the document content here; that would require Google Drive API + OAuth
+// which is a much larger commitment.
+ipcMain.handle('fs:readGdoc', async (_event, filePath) => {
+    if (!filePath || !fs.existsSync(filePath)) {
+        return { ok: false, error: 'File not found.' };
+    }
+    try {
+        const raw = fs.readFileSync(filePath, 'utf8');
+        const data = JSON.parse(raw);
+        // Different macOS versions have written this in slightly different
+        // shapes over the years; check the most common keys.
+        const url = data.url || data.uri || data.doc_id
+            ? (data.url || data.uri || `https://docs.google.com/document/d/${data.doc_id}/edit`)
+            : null;
+        if (!url) {
+            return { ok: false, error: 'No URL found in .gdoc pointer file.' };
+        }
+        return { ok: true, url };
+    } catch (error) {
+        return { ok: false, error: `gdoc parse failed: ${error.message}` };
+    }
+});
+
+// Open a URL in the user's default browser via Electron's shell module.
+// Used to hand off .gdoc URLs to Chrome/Safari/etc.
+ipcMain.handle('shell:openExternal', async (_event, url) => {
+    if (!url || typeof url !== 'string') {
+        return { ok: false, error: 'Missing or invalid URL.' };
+    }
+    // Defense in depth: only allow http(s) and mailto schemes. Refuses
+    // file://, javascript:, data: and other potentially dangerous schemes.
+    if (!/^(https?:|mailto:)/i.test(url)) {
+        return { ok: false, error: 'Refused: only http, https, and mailto URLs are allowed.' };
+    }
+    try {
+        await shell.openExternal(url);
         return { ok: true };
     } catch (error) {
         return { ok: false, error: error.message };

@@ -14,6 +14,9 @@ if (typeof window !== 'undefined' && !window.api) {
         listDirectory: async () => [],
         readFile: async () => ({ ok: false, error: 'stub' }),
         writeFile: async () => ({ ok: true }),
+        readDocx: async () => ({ ok: false, error: 'stub' }),
+        readGdoc: async () => ({ ok: false, error: 'stub' }),
+        openExternal: async () => ({ ok: true }),
         getSettings: async () => ({
             spePath: '',
             ai: { provider: 'openrouter', model: '', apiKey: '', baseUrl: '' }

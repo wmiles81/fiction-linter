@@ -30,7 +30,8 @@ describe('FileTree', () => {
         const docxRow = container.querySelector('[data-path="/p/old.docx"]');
         const mdRow = container.querySelector('[data-path="/p/manuscript.md"]');
         expect(jpgRow?.className).toMatch(/disabled/);
-        expect(docxRow?.className).toMatch(/disabled/);
+        // .docx is now eligible — handled via mammoth import path in App.jsx.
+        expect(docxRow?.className).not.toMatch(/disabled/);
         expect(mdRow?.className).not.toMatch(/disabled/);
     });
 

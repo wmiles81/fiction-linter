@@ -2,10 +2,12 @@ import React, { useEffect, useMemo, useRef } from 'react';
 import { PatternLinterCore, NameValidatorCore } from '@shared/linting';
 import FileTree from './components/FileTree';
 import Editor from './components/editor/Editor';
+import { htmlToMarkdown } from './components/editor/converters';
 import SettingsDialog from './components/SettingsDialog';
 import PanelResizer from './components/PanelResizer';
 import TabBar from './components/TabBar';
 import StatusBar from './components/StatusBar';
+import { getFileKind } from './lib/fileEligibility';
 import { useAppStore } from './store/useAppStore';
 import { useEditorStore } from './store/useEditorStore';
 import { useLintStore } from './store/useLintStore';
@@ -213,17 +215,84 @@ function App() {
 
     const handleSelectFile = async node => {
         if (node.isDirectory) return;
-        const result = await window.api.readFile(node.path);
-        if (!result.ok) {
-            setStatus(result.error || 'Unable to read file.');
+
+        // Dispatch on the file's kind so .docx and .gdoc take their own paths
+        // instead of being treated as plain text. getFileKind also acts as a
+        // belt-and-suspenders eligibility check — the FileTree should already
+        // have prevented clicks on truly ineligible files.
+        const kind = getFileKind(node.name);
+
+        if (kind === 'text') {
+            const result = await window.api.readFile(node.path);
+            if (!result.ok) {
+                setStatus(result.error || 'Unable to read file.');
+                return;
+            }
+            openFile({
+                path: node.path,
+                name: node.name,
+                markdownSource: result.contents
+            });
+            setStatus('Loaded file.');
             return;
         }
-        openFile({
-            path: node.path,
-            name: node.name,
-            markdownSource: result.contents
-        });
-        setStatus('Loaded file.');
+
+        if (kind === 'docx') {
+            // Read the .docx via main process (mammoth → HTML), then convert
+            // HTML to markdown via the same unified pipeline the editor uses
+            // for paste handling. Open as a tab whose path is the SIBLING .md
+            // path so Save writes to a new .md file rather than corrupting
+            // the original .docx.
+            setStatus(`Importing ${node.name}…`);
+            const result = await window.api.readDocx(node.path);
+            if (!result.ok) {
+                setStatus(result.error || 'Unable to import .docx.');
+                return;
+            }
+            try {
+                const markdown = await htmlToMarkdown(result.html || '');
+                // Replace the trailing extension (case-insensitive) with .md
+                const mdPath = node.path.replace(/\.docx$/i, '.md');
+                const mdName = node.name.replace(/\.docx$/i, '.md');
+                openFile({
+                    path: mdPath,
+                    name: mdName,
+                    markdownSource: markdown
+                });
+                const warningCount = (result.messages || []).filter(m => m.type === 'warning').length;
+                setStatus(
+                    warningCount > 0
+                        ? `Imported ${node.name} as ${mdName} (${warningCount} conversion warnings; Save writes to .md sibling)`
+                        : `Imported ${node.name} as ${mdName} (Save writes to .md sibling)`
+                );
+            } catch (err) {
+                setStatus(`Conversion failed: ${err.message}`);
+            }
+            return;
+        }
+
+        if (kind === 'gdoc') {
+            // .gdoc files are JSON pointers — read out the URL and hand it to
+            // the default browser. The user can then copy-paste back into a
+            // new editor tab; the paste pipeline (Phase 7.7) handles gdoc
+            // styled-span HTML via the styledSpansToSemanticPlugin.
+            const result = await window.api.readGdoc(node.path);
+            if (!result.ok || !result.url) {
+                setStatus(result.error || 'Unable to open .gdoc pointer.');
+                return;
+            }
+            const opened = await window.api.openExternal(result.url);
+            if (!opened.ok) {
+                setStatus(opened.error || 'Unable to open URL externally.');
+                return;
+            }
+            setStatus(`Opened ${node.name} in browser. Copy and paste into a new tab to edit here.`);
+            return;
+        }
+
+        // Fallthrough: should never happen because the FileTree disables
+        // ineligible files, but defensive against future regressions.
+        setStatus(`Cannot open ${node.name}: unsupported file type.`);
     };
 
     const handleSave = async () => {
