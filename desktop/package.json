@@ -9,7 +9,8 @@
     "start": "electron .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "dist": "npm run build && electron-builder --mac"
   },
   "dependencies": {
     "@codemirror/lang-markdown": "^6.5.0",
@@ -29,8 +30,35 @@
     "@vitejs/plugin-react": "^4.3.1",
     "@vitest/coverage-v8": "^4.1.4",
     "concurrently": "^9.0.1",
+    "electron-builder": "^26.8.1",
     "jsdom": "^29.0.2",
     "vite": "^5.4.3",
     "vitest": "^4.1.4"
+  },
+  "build": {
+    "appId": "com.ocotilloquill.fictionlinter.desktop",
+    "productName": "Fiction Linter",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "electron/**/*",
+      "dist/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "../resources/spe_defaults",
+        "to": "spe_defaults",
+        "filter": ["**/*.yaml"]
+      }
+    ],
+    "mac": {
+      "category": "public.app-category.productivity",
+      "target": [
+        { "target": "dmg", "arch": ["arm64", "x64"] }
+      ],
+      "identity": null
+    }
   }
 }

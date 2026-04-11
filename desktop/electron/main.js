@@ -4,11 +4,12 @@ const fs = require('fs');
 const yaml = require('js-yaml');
 const { callChatCompletion } = require('./aiClient');
 const { buildExplainMessages, buildRewriteMessages } = require('./prompts');
+const { getDefaultSpePath: resolveDefaultSpePath } = require('./spePath');
 
 const SETTINGS_FILE = 'settings.json';
 
 function getDefaultSpePath() {
-    return path.resolve(app.getAppPath(), '..', 'resources', 'spe_defaults');
+    return resolveDefaultSpePath();
 }
 
 function readSettings() {
