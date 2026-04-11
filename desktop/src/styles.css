@@ -660,3 +660,125 @@ body {
 .tab-bar-clear:hover {
     color: var(--g-danger, #b33a3a);
 }
+
+.modal-card-wide {
+    max-width: 640px;
+    width: 90vw;
+}
+
+.model-picker {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.model-picker-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.model-picker-loading {
+    color: var(--g-text-muted, #6b655b);
+    font-weight: 400;
+    font-style: italic;
+}
+
+.model-picker-error {
+    color: var(--g-danger, #b33a3a);
+    font-weight: 400;
+}
+
+.model-listbox {
+    border: 1px solid var(--g-border, #d7d2c5);
+    border-radius: 4px;
+    max-height: 200px;
+    overflow-y: auto;
+    font-family: 'JetBrains Mono', Menlo, monospace;
+    font-size: 12px;
+}
+
+.model-listbox-empty {
+    padding: 16px;
+    color: var(--g-text-muted, #6b655b);
+    text-align: center;
+    font-family: inherit;
+    font-size: 12px;
+}
+
+.model-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 6px 12px;
+    cursor: pointer;
+    border-bottom: 1px solid rgba(0,0,0,0.04);
+    line-height: 1.3;
+}
+
+.model-row:last-child {
+    border-bottom: none;
+}
+
+.model-row:hover {
+    background: rgba(0,0,0,0.03);
+}
+
+.model-row.selected {
+    background: var(--g-accent-bg, #e8f0e8);
+    color: var(--g-accent, #4a7a4a);
+}
+
+.model-row.thinking .model-row-id {
+    color: var(--g-danger, #b33a3a);
+    font-weight: 600;
+}
+
+.model-row-price {
+    font-variant-numeric: tabular-nums;
+    color: var(--g-text-muted, #6b655b);
+}
+
+.model-row.selected .model-row-price {
+    color: var(--g-accent, #4a7a4a);
+}
+
+.hyperparameter-panel {
+    margin-top: 12px;
+    padding: 10px 12px;
+    border: 1px solid var(--g-border, #d7d2c5);
+    border-radius: 4px;
+    background: rgba(0,0,0,0.02);
+}
+
+.hyperparameter-panel-header {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-bottom: 10px;
+    color: var(--g-text-muted, #6b655b);
+}
+
+.hyperparameter-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 8px 16px;
+}
+
+.hyperparameter-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 11px;
+}
+
+.hyperparameter-field input,
+.hyperparameter-field select {
+    padding: 4px 8px;
+    border: 1px solid var(--g-border, #d7d2c5);
+    border-radius: 3px;
+    font-size: 12px;
+    background: white;
+}

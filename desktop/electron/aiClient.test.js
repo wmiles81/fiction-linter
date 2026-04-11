@@ -25,7 +25,8 @@ describe('callChatCompletion', () => {
             baseUrl: 'https://api.example.com/v1',
             apiKey: 'sk-test-abc',
             model: 'openai/gpt-4.1-mini',
-            messages: [{ role: 'user', content: 'hi' }]
+            messages: [{ role: 'user', content: 'hi' }],
+            hyperparameters: { temperature: 0.7, max_tokens: 256 }
         });
 
         expect(global.fetch).toHaveBeenCalledTimes(1);
@@ -37,6 +38,9 @@ describe('callChatCompletion', () => {
         const body = JSON.parse(options.body);
         expect(body.model).toBe('openai/gpt-4.1-mini');
         expect(body.messages).toEqual([{ role: 'user', content: 'hi' }]);
+        // hyperparameters are spread into the body
+        expect(body.temperature).toBe(0.7);
+        expect(body.max_tokens).toBe(256);
 
         expect(result).toEqual({ ok: true, content: 'hello' });
     });

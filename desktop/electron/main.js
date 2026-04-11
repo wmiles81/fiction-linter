@@ -3,6 +3,7 @@ const path = require('path');
 const fs = require('fs');
 const yaml = require('js-yaml');
 const { callChatCompletion } = require('./aiClient');
+const { fetchModels } = require('./modelCatalog');
 const { buildExplainMessages, buildRewriteMessages } = require('./prompts');
 const { getDefaultSpePath: resolveDefaultSpePath } = require('./spePath');
 const { installMenu } = require('./menu');
@@ -44,7 +45,8 @@ function readSettings() {
                 provider: 'openrouter',
                 model: 'openai/gpt-4.1-mini',
                 apiKey: '',
-                baseUrl: ''
+                baseUrl: '',
+                hyperparameters: {}
             }
         };
     }
@@ -58,7 +60,8 @@ function readSettings() {
                 provider: data.ai?.provider || 'openrouter',
                 model: data.ai?.model || 'openai/gpt-4.1-mini',
                 apiKey: data.ai?.apiKey || '',
-                baseUrl: data.ai?.baseUrl || ''
+                baseUrl: data.ai?.baseUrl || '',
+                hyperparameters: data.ai?.hyperparameters || {}
             }
         };
     } catch (error) {
@@ -68,7 +71,8 @@ function readSettings() {
                 provider: 'openrouter',
                 model: 'openai/gpt-4.1-mini',
                 apiKey: '',
-                baseUrl: ''
+                baseUrl: '',
+                hyperparameters: {}
             }
         };
     }
@@ -82,7 +86,8 @@ function writeSettings(settings) {
             provider: settings.ai?.provider || 'openrouter',
             model: settings.ai?.model || 'openai/gpt-4.1-mini',
             apiKey: settings.ai?.apiKey || '',
-            baseUrl: settings.ai?.baseUrl || ''
+            baseUrl: settings.ai?.baseUrl || '',
+            hyperparameters: settings.ai?.hyperparameters || {}
         }
     };
     fs.writeFileSync(settingsPath, JSON.stringify(payload, null, 2), 'utf8');
@@ -197,6 +202,10 @@ ipcMain.handle('settings:set', async (_event, settings) => {
     return writeSettings(settings || {});
 });
 
+ipcMain.handle('models:fetch', async (_event, providerConfig) => {
+    return fetchModels(providerConfig || {});
+});
+
 ipcMain.handle('tabs:load', async () => readTabs());
 
 ipcMain.handle('tabs:save', async (_event, state) => writeTabs(state || {}));
@@ -250,6 +259,7 @@ ipcMain.handle('ai:complete', async (_event, payload) => {
         baseUrl: settings.ai.baseUrl,
         apiKey: settings.ai.apiKey,
         model: settings.ai.model,
+        hyperparameters: settings.ai.hyperparameters,
         messages
     });
 });

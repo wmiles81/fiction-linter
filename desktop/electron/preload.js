@@ -9,6 +9,7 @@ contextBridge.exposeInMainWorld('api', {
     saveSettings: settings => ipcRenderer.invoke('settings:set', settings),
     loadSpeData: spePath => ipcRenderer.invoke('spe:load', spePath),
     aiComplete: payload => ipcRenderer.invoke('ai:complete', payload),
+    fetchModels: config => ipcRenderer.invoke('models:fetch', config),
     loadTabs: () => ipcRenderer.invoke('tabs:load'),
     saveTabs: state => ipcRenderer.invoke('tabs:save', state),
     onMenuAction: (callback) => {
