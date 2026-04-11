@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import yaml from 'js-yaml';
 import { PatternLinterCore, NameValidatorCore } from '@shared/linting';
 import FileTree from './components/FileTree';
@@ -25,6 +25,8 @@ function App() {
     const [showSettings, setShowSettings] = useState(false);
     const [status, setStatus] = useState('Ready');
 
+    const editorRef = useRef(null);
+
     const patternCore = useMemo(() => new PatternLinterCore(), []);
     const nameCore = useMemo(() => new NameValidatorCore(), []);
 
@@ -43,21 +45,25 @@ function App() {
             return;
         }
 
-        const findings = [
-            ...patternCore.lintText(content, speData),
-            ...nameCore.lintText(content, speData)
-        ];
+        const handle = setTimeout(() => {
+            const findings = [
+                ...patternCore.lintText(content, speData),
+                ...nameCore.lintText(content, speData)
+            ];
 
-        const mapped = findings.map(finding => {
-            const start = indexToLineCol(content, finding.start);
-            return {
-                ...finding,
-                line: start.line,
-                column: start.column
-            };
-        });
+            const mapped = findings.map(finding => {
+                const start = indexToLineCol(content, finding.start);
+                return {
+                    ...finding,
+                    line: start.line,
+                    column: start.column
+                };
+            });
 
-        setIssues(mapped);
+            setIssues(mapped);
+        }, 300);
+
+        return () => clearTimeout(handle);
     }, [content, speData, patternCore, nameCore, settings]);
 
     const handleChooseFolder = async () => {
@@ -117,6 +123,15 @@ function App() {
         setShowSettings(false);
     };
 
+    const handleJumpToIssue = issue => {
+        const textarea = editorRef.current;
+        if (!textarea) return;
+        textarea.focus();
+        textarea.setSelectionRange(issue.start, issue.end);
+        // Best-effort scroll — textarea doesn't expose a built-in "scroll to selection",
+        // but focusing + selection typically scrolls the caret into view on most browsers.
+    };
+
     return (
         <div className="app-shell">
             <header className="top-bar">
@@ -160,6 +175,7 @@ function App() {
 
                 <main className="right-panel">
                     <EditorPanel
+                        ref={editorRef}
                         file={currentFile}
                         content={content}
                         dirty={dirty}
@@ -171,7 +187,7 @@ function App() {
                         }}
                         onSave={handleSave}
                     />
-                    <IssueList issues={issues} />
+                    <IssueList issues={issues} onJump={handleJumpToIssue} />
                 </main>
             </div>
 

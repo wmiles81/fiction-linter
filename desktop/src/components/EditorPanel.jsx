@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { forwardRef } from 'react';
 
-function EditorPanel({ file, content, dirty, onChange, onSave }) {
+const EditorPanel = forwardRef(function EditorPanel({ file, content, dirty, onChange, onSave }, ref) {
     return (
         <section className="editor-panel">
             <div className="editor-header">
@@ -15,6 +15,7 @@ function EditorPanel({ file, content, dirty, onChange, onSave }) {
                 </div>
             </div>
             <textarea
+                ref={ref}
                 className="editor-textarea"
                 value={content}
                 placeholder="Select a file to start editing."
@@ -23,6 +24,6 @@ function EditorPanel({ file, content, dirty, onChange, onSave }) {
             />
         </section>
     );
-}
+});
 
 export default EditorPanel;

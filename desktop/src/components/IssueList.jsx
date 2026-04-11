@@ -6,7 +6,7 @@ const severityLabels = {
     info: 'Info'
 };
 
-function IssueList({ issues }) {
+function IssueList({ issues, onJump }) {
     if (!issues.length) {
         return (
             <section className="issues-panel empty">
@@ -27,6 +27,16 @@ function IssueList({ issues }) {
                             <span className="issue-location">Line {issue.line}, Col {issue.column}</span>
                         </div>
                         <div className="issue-message">{issue.message}</div>
+                        <div className="issue-actions">
+                            <button
+                                type="button"
+                                className="ghost-button"
+                                onClick={() => onJump?.(issue)}
+                                aria-label={`Jump to line ${issue.line}, column ${issue.column}`}
+                            >
+                                Jump to {issue.line}:{issue.column}
+                            </button>
+                        </div>
                     </div>
                 ))}
             </div>
