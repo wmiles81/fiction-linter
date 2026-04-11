@@ -5,6 +5,7 @@ const yaml = require('js-yaml');
 const { callChatCompletion } = require('./aiClient');
 const { buildExplainMessages, buildRewriteMessages } = require('./prompts');
 const { getDefaultSpePath: resolveDefaultSpePath } = require('./spePath');
+const { installMenu } = require('./menu');
 
 const SETTINGS_FILE = 'settings.json';
 const TABS_FILE = 'tabs.json';
@@ -115,6 +116,7 @@ function createWindow() {
 
 app.whenReady().then(() => {
     createWindow();
+    installMenu();
 
     app.on('activate', () => {
         if (BrowserWindow.getAllWindows().length === 0) {

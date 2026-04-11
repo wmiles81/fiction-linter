@@ -22,6 +22,7 @@ if (typeof window !== 'undefined' && !window.api) {
         loadSpeData: async () => ({ cliches: {}, names: {}, places: {}, protocols: {} }),
         aiComplete: async () => ({ ok: false, error: 'stub' }),
         loadTabs: async () => ({ tabs: [], activeTabId: null }),
-        saveTabs: async state => state
+        saveTabs: async state => state,
+        onMenuAction: (_cb) => () => {}
     };
 }

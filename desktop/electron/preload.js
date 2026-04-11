@@ -10,5 +10,10 @@ contextBridge.exposeInMainWorld('api', {
     loadSpeData: spePath => ipcRenderer.invoke('spe:load', spePath),
     aiComplete: payload => ipcRenderer.invoke('ai:complete', payload),
     loadTabs: () => ipcRenderer.invoke('tabs:load'),
-    saveTabs: state => ipcRenderer.invoke('tabs:save', state)
+    saveTabs: state => ipcRenderer.invoke('tabs:save', state),
+    onMenuAction: (callback) => {
+        const handler = (_event, payload) => callback(payload);
+        ipcRenderer.on('menu:action', handler);
+        return () => ipcRenderer.removeListener('menu:action', handler);
+    }
 });

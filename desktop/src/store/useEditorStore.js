@@ -13,20 +13,29 @@ function pickNewActive(tabs, closingId, currentActiveId) {
     return null;
 }
 
+// Leading-edge debounce: coalesce bursts of mutations (e.g. per-keystroke
+// updateContent calls) into a single disk write 400ms after the latest
+// mutation. Each call cancels the previous pending timer and schedules a
+// fresh one reading from the latest state reference. Zustand state snapshots
+// are immutable, so the timeout always writes the most recent state.
+let _persistTimeout = null;
 function persistNow(state) {
     if (typeof window === 'undefined' || !window.api?.saveTabs) return;
-    // Save a trimmed version: only the fields we want to persist.
-    const payload = {
-        tabs: state.tabs.map(t => ({
-            id: t.id,
-            path: t.path,
-            name: t.name,
-            markdownSource: t.markdownSource,
-            dirty: t.dirty
-        })),
-        activeTabId: state.activeTabId
-    };
-    window.api.saveTabs(payload).catch(() => { /* best effort */ });
+    if (_persistTimeout) clearTimeout(_persistTimeout);
+    _persistTimeout = setTimeout(() => {
+        _persistTimeout = null;
+        const payload = {
+            tabs: state.tabs.map(t => ({
+                id: t.id,
+                path: t.path,
+                name: t.name,
+                markdownSource: t.markdownSource,
+                dirty: t.dirty
+            })),
+            activeTabId: state.activeTabId
+        };
+        window.api.saveTabs(payload).catch(() => { /* best effort */ });
+    }, 400);
 }
 
 // Zustand middleware: wraps `set` so every mutation writes to userData/tabs.json.

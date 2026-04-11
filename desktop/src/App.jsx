@@ -90,6 +90,48 @@ function App() {
     }, [hydrate]);
 
     useEffect(() => {
+        if (!window.api?.onMenuAction) return;
+        const unsubscribe = window.api.onMenuAction((payload) => {
+            const action = payload?.action;
+            switch (action) {
+                case 'new-file':
+                    useEditorStore.getState().newEmptyTab();
+                    break;
+                case 'open-folder':
+                    handleChooseFolder();
+                    break;
+                case 'save':
+                    handleSave();
+                    break;
+                case 'save-as':
+                    setStatus('Save As not yet implemented.');
+                    break;
+                case 'close-tab':
+                    if (activeTabId) closeTab(activeTabId);
+                    break;
+                case 'open-settings':
+                    setShowSettings(true);
+                    break;
+                case 'toggle-lint':
+                    setLintEnabled(!lintEnabled);
+                    break;
+                case 'toggle-findings':
+                    setShowFindings(!showFindings);
+                    break;
+                case 'find':
+                    setStatus('Find not yet implemented.');
+                    break;
+                case 'open-help':
+                    window.open('https://github.com/wmiles81/fiction-linter', '_blank');
+                    break;
+                default:
+                    break;
+            }
+        });
+        return unsubscribe;
+    }, [activeTabId, lintEnabled, showFindings]);
+
+    useEffect(() => {
         if (!settings?.spePath) return;
         window.api.loadSpeData(settings.spePath).then(setSpeData);
     }, [settings?.spePath, setSpeData]);
