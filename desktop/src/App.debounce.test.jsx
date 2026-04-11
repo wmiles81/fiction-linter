@@ -56,15 +56,26 @@ describe('App — lint debounce', () => {
         await act(async () => { vi.advanceTimersByTime(350); });
         expect(lintSpy).toHaveBeenCalledTimes(1);
 
-        // Type rapidly into the textarea.
-        const textarea = screen.getByRole('textbox');
-        await act(async () => { await user.type(textarea, 'XYZ'); });
+        // Simulate a burst of content changes by re-opening the file with
+        // different content. This drives App's `setContent` without
+        // poking CodeMirror's contenteditable (unreliable in jsdom).
+        // Scope to the tree-row button: after a file is loaded, the editor
+        // header also renders "story.md", so plain getByText is ambiguous.
+        const treeRow = screen.getByRole('button', { name: /story\.md/ });
+        window.api.readFile = async () => ({ ok: true, contents: 'Updated content one.' });
+        await act(async () => {
+            await user.click(treeRow);
+        });
+        window.api.readFile = async () => ({ ok: true, contents: 'Updated content two.' });
+        await act(async () => {
+            await user.click(treeRow);
+        });
 
         // Advance less than the debounce window → still only 1 call.
         await act(async () => { vi.advanceTimersByTime(100); });
         expect(lintSpy).toHaveBeenCalledTimes(1);
 
-        // Advance past the window → one more call (total = 2, not 4).
+        // Advance past the window → one more call for the latest content.
         await act(async () => { vi.advanceTimersByTime(300); });
         expect(lintSpy).toHaveBeenCalledTimes(2);
     });

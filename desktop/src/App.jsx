@@ -124,12 +124,7 @@ function App() {
     };
 
     const handleJumpToIssue = issue => {
-        const textarea = editorRef.current;
-        if (!textarea) return;
-        textarea.focus();
-        textarea.setSelectionRange(issue.start, issue.end);
-        // Best-effort scroll — textarea doesn't expose a built-in "scroll to selection",
-        // but focusing + selection typically scrolls the caret into view on most browsers.
+        editorRef.current?.jumpTo(issue);
     };
 
     return (
@@ -179,6 +174,7 @@ function App() {
                         file={currentFile}
                         content={content}
                         dirty={dirty}
+                        issues={issues}
                         onChange={value => {
                             setContent(value);
                             if (currentFile) {

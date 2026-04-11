@@ -375,3 +375,20 @@ body {
         grid-template-columns: 1fr;
     }
 }
+
+/* --- CodeMirror surface (Phase 3) --- */
+.editor-surface {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    background: var(--g-bg, #ffffff);
+}
+
+.editor-surface .cm-editor {
+    flex: 1;
+    min-width: 0;
+}
+
+.editor-surface .cm-editor.cm-focused {
+    outline: none;
+}
