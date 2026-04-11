@@ -56,12 +56,16 @@ export class PatternLinterCore {
     }
 
     private isInsideQuotes(index: number, text: string): boolean {
-        let quoteCount = 0;
-        const lastNewline = text.lastIndexOf('\n', index);
-        const searchStart = lastNewline === -1 ? 0 : lastNewline;
+        // Scope quote counting to the current paragraph (bounded by blank lines
+        // or document start). This handles multi-line quotes within a paragraph
+        // without getting tangled in cross-paragraph dialogue conventions.
+        const paragraphStart = text.lastIndexOf('\n\n', index);
+        const searchStart = paragraphStart === -1 ? 0 : paragraphStart + 2;
 
+        let quoteCount = 0;
         for (let i = searchStart; i < index; i++) {
-            if (text[i] === '"' || text[i] === '\u201C' || text[i] === '\u201D') {
+            const ch = text[i];
+            if (ch === '"' || ch === '\u201C' || ch === '\u201D') {
                 quoteCount++;
             }
         }

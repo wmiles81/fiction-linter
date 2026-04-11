@@ -295,9 +295,9 @@ describe('PatternLinterCore.isInsideQuotes (via lintText)', () => {
 
     it('excludes the phrase when a multi-line quote opens before and closes after (same paragraph)', () => {
         const text = [
-            '"This was the moment I always feared,"',
-            'he said, voice trembling as a shiver down his spine',
-            'made him clench his jaw. "I cannot face them now."'
+            '"Everything in me tightened as',
+            'a shiver down his spine told me',
+            'this was the moment I had feared."'
         ].join('\n');
         const findings = core.lintText(text, makeData());
         expect(findings).toHaveLength(0);
