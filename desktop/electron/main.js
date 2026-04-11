@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell, session, net } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const yaml = require('js-yaml');
@@ -8,6 +8,82 @@ const { fetchModels } = require('./modelCatalog');
 const { buildExplainMessages, buildRewriteMessages } = require('./prompts');
 const { getDefaultSpePath: resolveDefaultSpePath } = require('./spePath');
 const { installMenu } = require('./menu');
+
+// Persistent session partition for Google Docs authentication. Cookies stored
+// here survive app restarts. Used by both the gdoc:fetch path (via net.request)
+// AND the gdoc:auth interactive sign-in window (via webPreferences.session).
+// Approach borrowed from Focus-viewer-spec/09-google-docs.md — instead of
+// registering a Google Cloud OAuth client, we BE the logged-in browser.
+const GOOGLE_AUTH_PARTITION = 'persist:google-auth';
+const GOOGLE_USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
+
+function getGoogleSession() {
+    return session.fromPartition(GOOGLE_AUTH_PARTITION);
+}
+
+// Detect a Google login page in a response body. Google sometimes returns
+// HTTP 200 with a login page when an unauthenticated request hits the export
+// URL — content-type alone isn't enough.
+function isGoogleLoginPage(body) {
+    if (!body) return false;
+    return body.includes('accounts.google.com') ||
+           body.includes('ServiceLogin') ||
+           body.includes('identifier-shown');
+}
+
+// Promise wrapper around Electron's net.request. Returns:
+//   { ok: true, body, contentType, status }       on successful fetch
+//   { ok: false, kind: 'auth-required', reason }  on 401/403/login page
+//   { ok: false, error }                          on network/other failures
+function fetchWithGoogleSession(url) {
+    return new Promise((resolve) => {
+        const request = net.request({
+            method: 'GET',
+            url,
+            session: getGoogleSession(),
+            useSessionCookies: true,
+            redirect: 'follow'
+        });
+        request.setHeader('User-Agent', GOOGLE_USER_AGENT);
+
+        const chunks = [];
+        request.on('response', (response) => {
+            response.on('data', (chunk) => chunks.push(chunk));
+            response.on('end', () => {
+                const body = Buffer.concat(chunks).toString('utf8');
+                const status = response.statusCode || 0;
+                let contentType = response.headers['content-type'] || '';
+                if (Array.isArray(contentType)) contentType = contentType.join('; ');
+
+                // 401 / 403 → auth required
+                if (status === 401 || status === 403) {
+                    return resolve({ ok: false, kind: 'auth-required', reason: `HTTP ${status}` });
+                }
+                // Login page in body → auth required
+                if (isGoogleLoginPage(body)) {
+                    return resolve({ ok: false, kind: 'auth-required', reason: 'Google login page returned' });
+                }
+                // 2xx with non-login body → success
+                if (status >= 200 && status < 300) {
+                    return resolve({ ok: true, body, contentType, status });
+                }
+                resolve({ ok: false, error: `HTTP ${status}` });
+            });
+            response.on('error', (err) => resolve({ ok: false, error: err.message }));
+        });
+        request.on('error', (err) => resolve({ ok: false, error: err.message }));
+
+        // 30s safety timeout — Google export of large docs can take a few seconds.
+        const timeoutId = setTimeout(() => {
+            try { request.abort(); } catch { /* request may already be done */ }
+            resolve({ ok: false, error: 'Request timed out after 30s' });
+        }, 30000);
+        request.on('response', () => clearTimeout(timeoutId));
+        request.on('error', () => clearTimeout(timeoutId));
+
+        request.end();
+    });
+}
 
 const SETTINGS_FILE = 'settings.json';
 const TABS_FILE = 'tabs.json';
@@ -220,45 +296,55 @@ ipcMain.handle('fs:readDocx', async (_event, filePath) => {
     }
 });
 
-// Read a .gdoc pointer file and (best effort) fetch the actual document
-// content via Google's unauthenticated export URL. .gdoc files on disk are
-// tiny JSON pointers to cloud documents — there's no content locally.
+// Read a .gdoc pointer file and fetch the actual document content from
+// Google. .gdoc files on disk are tiny JSON pointers to cloud documents —
+// no content locally.
 //
-// Strategy:
-//   1. Parse the JSON, extract doc_id (or scrape from a URL field).
-//   2. Try GET https://docs.google.com/document/d/{id}/export?format=docx
-//   3. If the response is application/vnd.openxmlformats... (real docx
-//      binary), run mammoth on it and return { kind: 'imported', html, ... }.
-//      The renderer handles this exactly like a local .docx import.
-//   4. If the response Content-Type is text/html, the fetch was redirected
-//      to a Google login page — the doc is private and we can't read it
-//      without OAuth. Return { kind: 'auth-required', url: <doc-url> } so
-//      the renderer can fall back to opening in the user's browser.
-//
-// Future Phase 8: full Google Drive OAuth would let private docs open
-// inline too, but that's a registered Google Cloud project + client_id +
-// refresh token storage, which is well outside the scope of "make .gdoc
-// open here when possible."
+// Strategy (per Focus-viewer-spec/09-google-docs.md):
+//   1. Parse the file: try JSON first, fall back to URL extraction from text.
+//   2. Extract the doc_id (from json field or by regex on the URL).
+//   3. Fetch https://docs.google.com/document/d/{id}/export?format=html
+//      using Electron's net.request with a persistent session partition
+//      (persist:google-auth). Cookies from a prior interactive sign-in
+//      automatically attach.
+//   4. If the response is HTML and is NOT a Google login page → return
+//      { kind: 'imported', html, baseName, sourceUrl }. The renderer pipes
+//      the HTML through htmlToMarkdown (the same converter used for paste,
+//      including the styledSpansToSemanticPlugin that handles Google Docs
+//      styled spans) and opens as an editor tab.
+//   5. If the response is a login page or 401/403 → return
+//      { kind: 'auth-required', url }. The renderer prompts the user to
+//      sign in via gdoc:auth, which opens an interactive sign-in window
+//      sharing the same session partition. After successful sign-in, the
+//      renderer retries fs:readGdoc once.
 ipcMain.handle('fs:readGdoc', async (_event, filePath) => {
     if (!filePath || !fs.existsSync(filePath)) {
         return { ok: false, error: 'File not found.' };
     }
 
-    // 1. Parse the JSON pointer.
+    // Parse the .gdoc pointer file. Two strategies: JSON (the modern format),
+    // falling back to "scrape any URL out of the text" for older variants.
     let docId = null;
     let docUrl = null;
     try {
         const raw = fs.readFileSync(filePath, 'utf8');
-        const data = JSON.parse(raw);
-        // Different macOS / Drive versions have written this with different keys.
-        docId = data.doc_id || data.docId || null;
-        docUrl = data.url || data.uri || null;
-        // If we got a URL but no doc_id, try to extract the id from the URL.
-        if (!docId && docUrl) {
-            const m = docUrl.match(/\/document\/d\/([a-zA-Z0-9_-]+)/);
-            if (m) docId = m[1];
+        try {
+            const data = JSON.parse(raw);
+            docId = data.doc_id || data.docId || null;
+            docUrl = data.url || data.uri || null;
+            if (!docId && docUrl) {
+                const m = docUrl.match(/\/document\/d\/([a-zA-Z0-9_-]+)/);
+                if (m) docId = m[1];
+            }
+        } catch {
+            // Not valid JSON — try plain URL extraction.
+            const urlMatch = raw.match(/https?:\/\/[^\s"]+/);
+            if (urlMatch) {
+                docUrl = urlMatch[0];
+                const idMatch = docUrl.match(/\/document\/d\/([a-zA-Z0-9_-]+)/);
+                if (idMatch) docId = idMatch[1];
+            }
         }
-        // If we got a doc_id but no URL, build the canonical edit URL.
         if (!docUrl && docId) {
             docUrl = `https://docs.google.com/document/d/${docId}/edit`;
         }
@@ -270,56 +356,94 @@ ipcMain.handle('fs:readGdoc', async (_event, filePath) => {
         return { ok: false, error: 'No doc_id found in .gdoc pointer file.' };
     }
 
-    // 2. Attempt the unauthenticated docx export.
-    const exportUrl = `https://docs.google.com/document/d/${docId}/export?format=docx`;
-    let response;
-    try {
-        response = await fetch(exportUrl, {
-            method: 'GET',
-            redirect: 'follow',
-            // 30s timeout — large docs take a few seconds to export server-side.
-            signal: AbortSignal.timeout(30000)
+    // Fetch the HTML export via Electron net.request with the persistent
+    // Google auth session. If the user has signed in (via gdoc:auth) then
+    // the cookies in persist:google-auth will authenticate this request.
+    const exportUrl = `https://docs.google.com/document/d/${docId}/export?format=html`;
+    const result = await fetchWithGoogleSession(exportUrl);
+
+    if (result.ok) {
+        const baseName = path.basename(filePath, path.extname(filePath));
+        return {
+            ok: true,
+            kind: 'imported',
+            html: result.body || '',
+            baseName,
+            sourceUrl: docUrl
+        };
+    }
+
+    if (result.kind === 'auth-required') {
+        return { ok: true, kind: 'auth-required', url: docUrl, reason: result.reason };
+    }
+
+    return { ok: false, error: result.error || 'gdoc fetch failed' };
+});
+
+// Open an interactive Google sign-in window. Uses the same persist:google-auth
+// session partition that fs:readGdoc fetches with — so cookies set during
+// sign-in are automatically used by subsequent fetches. No OAuth client_id
+// or Google Cloud project required: we are simply driving Google's normal
+// browser-based sign-in flow inside an embedded BrowserWindow.
+//
+// Resolves with { ok: true } when sign-in completes (detected by navigation
+// to docs.google.com), or { ok: false, error } if the user closes the window.
+ipcMain.handle('gdoc:auth', async () => {
+    return new Promise((resolve) => {
+        const authSession = getGoogleSession();
+        const authWindow = new BrowserWindow({
+            width: 500,
+            height: 700,
+            title: 'Sign in to Google',
+            show: true,
+            webPreferences: {
+                session: authSession,
+                contextIsolation: true,
+                nodeIntegration: false,
+                sandbox: true
+            }
         });
+        authWindow.webContents.setUserAgent(GOOGLE_USER_AGENT);
+
+        let resolved = false;
+        const finish = (result) => {
+            if (resolved) return;
+            resolved = true;
+            if (!authWindow.isDestroyed()) {
+                authWindow.close();
+            }
+            resolve(result);
+        };
+
+        // Watch for navigation to docs.google.com — that's our signal that
+        // sign-in completed (Google's `continue=` parameter brings us there).
+        const handleNav = (_event, url) => {
+            if (url && url.startsWith('https://docs.google.com')) {
+                finish({ ok: true });
+            }
+        };
+        authWindow.webContents.on('did-navigate', handleNav);
+        authWindow.webContents.on('did-redirect-navigation', handleNav);
+        authWindow.webContents.on('did-navigate-in-page', handleNav);
+
+        authWindow.on('closed', () => {
+            finish({ ok: false, error: 'Sign-in window was closed before authentication completed.' });
+        });
+
+        authWindow.loadURL('https://accounts.google.com/ServiceLogin?continue=https://docs.google.com');
+    });
+});
+
+// Sign out of Google: clear all storage data for the persist:google-auth
+// partition (cookies, cache, local storage, etc.). After this the next
+// fs:readGdoc on a private doc will return auth-required again.
+ipcMain.handle('gdoc:signout', async () => {
+    try {
+        await getGoogleSession().clearStorageData();
+        return { ok: true };
     } catch (error) {
-        // Network failure — fall back to browser handoff so the user can at
-        // least open the doc somewhere.
-        return { ok: true, kind: 'auth-required', url: docUrl, reason: `Network error: ${error.message}` };
+        return { ok: false, error: error.message };
     }
-
-    // 3. Inspect the response.
-    const contentType = response.headers.get('content-type') || '';
-    const isDocx = contentType.includes('officedocument.wordprocessingml.document')
-        || contentType.includes('application/vnd.openxmlformats');
-
-    if (response.ok && isDocx) {
-        try {
-            const arrayBuffer = await response.arrayBuffer();
-            const buffer = Buffer.from(arrayBuffer);
-            const result = await mammoth.convertToHtml({ buffer });
-            // Best-effort name: use the .gdoc filename minus extension.
-            const baseName = path.basename(filePath, path.extname(filePath));
-            return {
-                ok: true,
-                kind: 'imported',
-                html: result.value || '',
-                messages: (result.messages || []).map(m => ({ type: m.type, message: m.message })),
-                baseName,
-                sourceUrl: docUrl
-            };
-        } catch (error) {
-            return { ok: false, error: `mammoth conversion failed: ${error.message}` };
-        }
-    }
-
-    // 4. Anything else (text/html login redirect, 401, 403, 404, etc.) —
-    //    we cannot fetch the content unauthenticated. Hand the URL back so
-    //    the renderer can fall back to opening it in the browser.
-    return {
-        ok: true,
-        kind: 'auth-required',
-        url: docUrl,
-        reason: `Document is private or requires authentication (HTTP ${response.status}, ${contentType || 'no content-type'})`
-    };
 });
 
 // Open a URL in the user's default browser via Electron's shell module.

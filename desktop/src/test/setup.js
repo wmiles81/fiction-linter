@@ -16,6 +16,8 @@ if (typeof window !== 'undefined' && !window.api) {
         writeFile: async () => ({ ok: true }),
         readDocx: async () => ({ ok: false, error: 'stub' }),
         readGdoc: async () => ({ ok: false, error: 'stub' }),
+        gdocAuth: async () => ({ ok: false, error: 'stub' }),
+        gdocSignout: async () => ({ ok: true }),
         openExternal: async () => ({ ok: true }),
         getSettings: async () => ({
             spePath: '',
