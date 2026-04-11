@@ -272,97 +272,30 @@ function App() {
         }
 
         if (kind === 'gdoc') {
-            // .gdoc files are JSON pointers to cloud documents. Main fetches
-            // the actual content via Electron net.request with a persistent
-            // session partition (persist:google-auth). Three possible
-            // outcomes:
-            //   - kind: 'imported'       → cookies in the session were valid
-            //                              (or the doc is public). HTML
-            //                              export returned successfully.
-            //                              Convert to markdown and open as
-            //                              a tab.
-            //   - kind: 'auth-required'  → no cookies (or expired). Prompt
-            //                              the user to sign in via the
-            //                              gdoc:auth IPC, which opens an
-            //                              interactive sign-in window
-            //                              sharing the same session
-            //                              partition. After successful
-            //                              sign-in, retry the fetch once.
-            //   - !ok                    → real error (file missing, parse
-            //                              failure, network failure). Show
-            //                              the error in the status bar.
-
-            const importGdocResult = async (result) => {
-                try {
-                    const markdown = await htmlToMarkdown(result.html || '');
-                    // The .gdoc filename is sometimes "Untitled.gdoc" because
-                    // Drive sync uses placeholder names. Use the baseName main
-                    // extracted, or fall back to the filename minus .gdoc.
-                    const baseName = result.baseName || node.name.replace(/\.gdoc$/i, '');
-                    // Place the .md sibling next to the original .gdoc on
-                    // disk, matching the .docx import semantics.
-                    const dir = node.path.substring(0, node.path.lastIndexOf('/') + 1);
-                    const mdPath = `${dir}${baseName}.md`;
-                    const mdName = `${baseName}.md`;
-                    openFile({
-                        path: mdPath,
-                        name: mdName,
-                        markdownSource: markdown
-                    });
-                    setStatus(`Imported ${node.name} as ${mdName} (Save writes to .md sibling)`);
-                } catch (err) {
-                    setStatus(`Conversion failed: ${err.message}`);
-                }
-            };
-
-            setStatus(`Opening ${node.name}…`);
-            let result = await window.api.readGdoc(node.path);
-            if (!result.ok) {
-                setStatus(result.error || 'Unable to open .gdoc pointer.');
+            // .gdoc files are JSON pointers to cloud documents — there's no
+            // content locally. Read the JSON in main, get the URL out, hand
+            // it to shell.openExternal so the doc opens in the user's
+            // default browser.
+            //
+            // Inline gdoc import is currently disabled because it crashed
+            // Electron 31.7.7 on macOS 26.3.1 with a deterministic SIGSEGV
+            // inside fontations glyph rendering. Will return as a Phase 8
+            // feature once Electron is upgraded or full Google Drive OAuth
+            // is implemented.
+            const result = await window.api.readGdoc(node.path);
+            if (!result.ok || !result.url) {
+                setStatus(result.error || 'Unable to read .gdoc pointer.');
                 return;
             }
-
-            if (result.kind === 'imported') {
-                await importGdocResult(result);
+            const opened = await window.api.openExternal(result.url);
+            if (!opened.ok) {
+                setStatus(opened.error || 'Unable to open URL externally.');
                 return;
             }
-
-            if (result.kind === 'auth-required') {
-                // Try to sign in interactively. The gdoc:auth handler opens
-                // a Google sign-in window using the same session partition
-                // as the fetch — so cookies set during sign-in will be used
-                // by the retry below. No OAuth client_id required.
-                setStatus(`${node.name} requires Google sign-in. Opening sign-in window…`);
-                const authResult = await window.api.gdocAuth();
-                if (!authResult.ok) {
-                    setStatus(`Sign-in cancelled: ${authResult.error || 'unknown error'}. ${node.name} not opened.`);
-                    return;
-                }
-                // Retry once after successful sign-in.
-                setStatus(`Signed in. Retrying ${node.name}…`);
-                result = await window.api.readGdoc(node.path);
-                if (!result.ok) {
-                    setStatus(result.error || `Unable to open ${node.name} after sign-in.`);
-                    return;
-                }
-                if (result.kind === 'imported') {
-                    await importGdocResult(result);
-                    return;
-                }
-                if (result.kind === 'auth-required') {
-                    // Sign-in completed but the doc is STILL inaccessible —
-                    // probably a permissions issue (different account, no
-                    // access to that doc). Don't loop; surface the situation.
-                    setStatus(
-                        `${node.name} is not accessible to this Google account. ` +
-                        `Check sharing permissions or sign in with a different account (Settings → Sign out of Google).`
-                    );
-                    return;
-                }
-            }
-
-            // Unknown kind — should never happen, defensive.
-            setStatus(`Unable to open ${node.name}.`);
+            setStatus(
+                `Opened ${node.name} in browser. ` +
+                `(Inline gdoc import is deferred to Phase 8 — see session notes.)`
+            );
             return;
         }
 
