@@ -272,21 +272,75 @@ function App() {
         }
 
         if (kind === 'gdoc') {
-            // .gdoc files are JSON pointers — read out the URL and hand it to
-            // the default browser. The user can then copy-paste back into a
-            // new editor tab; the paste pipeline (Phase 7.7) handles gdoc
-            // styled-span HTML via the styledSpansToSemanticPlugin.
+            // .gdoc files are JSON pointers to cloud documents. Main attempts
+            // an unauthenticated GET on Google's docx export URL. Three
+            // possible outcomes:
+            //   - kind: 'imported'       → public/anyone-with-link doc; the
+            //                              docx binary was successfully
+            //                              fetched and converted to HTML by
+            //                              mammoth. Convert HTML to markdown
+            //                              and open as a tab, exactly like a
+            //                              local .docx import.
+            //   - kind: 'auth-required'  → private doc, login page returned.
+            //                              Fall back to opening the URL in
+            //                              the user's browser.
+            //   - !ok                    → real error (file missing, parse
+            //                              failure, mammoth crash). Show the
+            //                              error in the status bar.
+            setStatus(`Opening ${node.name}…`);
             const result = await window.api.readGdoc(node.path);
-            if (!result.ok || !result.url) {
+            if (!result.ok) {
                 setStatus(result.error || 'Unable to open .gdoc pointer.');
                 return;
             }
-            const opened = await window.api.openExternal(result.url);
-            if (!opened.ok) {
-                setStatus(opened.error || 'Unable to open URL externally.');
+
+            if (result.kind === 'imported') {
+                try {
+                    const markdown = await htmlToMarkdown(result.html || '');
+                    // The .gdoc filename is sometimes "Untitled.gdoc" because
+                    // Drive sync uses placeholder names. Use the baseName main
+                    // extracted, or fall back to the filename minus .gdoc.
+                    const baseName = result.baseName || node.name.replace(/\.gdoc$/i, '');
+                    // Place the .md sibling next to the original .gdoc on
+                    // disk, matching the .docx import semantics.
+                    const dir = node.path.substring(0, node.path.lastIndexOf('/') + 1);
+                    const mdPath = `${dir}${baseName}.md`;
+                    const mdName = `${baseName}.md`;
+                    openFile({
+                        path: mdPath,
+                        name: mdName,
+                        markdownSource: markdown
+                    });
+                    const warningCount = (result.messages || []).filter(m => m.type === 'warning').length;
+                    setStatus(
+                        warningCount > 0
+                            ? `Imported ${node.name} as ${mdName} (${warningCount} conversion warnings; Save writes to .md sibling)`
+                            : `Imported ${node.name} as ${mdName} (Save writes to .md sibling)`
+                    );
+                } catch (err) {
+                    setStatus(`Conversion failed: ${err.message}`);
+                }
                 return;
             }
-            setStatus(`Opened ${node.name} in browser. Copy and paste into a new tab to edit here.`);
+
+            if (result.kind === 'auth-required') {
+                // Private doc — we can't fetch it without OAuth. Open in
+                // the user's browser so they can sign in there, and tell
+                // them why the inline import did not work.
+                const opened = await window.api.openExternal(result.url);
+                if (!opened.ok) {
+                    setStatus(opened.error || 'Unable to open URL externally.');
+                    return;
+                }
+                setStatus(
+                    `${node.name} is private; opened in browser. ${result.reason ? '' : ''}` +
+                    `(Public/shared docs open inline. Make this doc "Anyone with the link can view" to import here.)`
+                );
+                return;
+            }
+
+            // Unknown kind — should never happen, defensive.
+            setStatus(`Unable to open ${node.name}.`);
             return;
         }
 

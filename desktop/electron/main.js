@@ -220,30 +220,106 @@ ipcMain.handle('fs:readDocx', async (_event, filePath) => {
     }
 });
 
-// Read a .gdoc pointer file. .gdoc files on disk are tiny JSON pointers to
-// cloud documents — they have no actual content. Returns the URL so the
-// renderer can hand it off to shell:openExternal. We do NOT attempt to fetch
-// the document content here; that would require Google Drive API + OAuth
-// which is a much larger commitment.
+// Read a .gdoc pointer file and (best effort) fetch the actual document
+// content via Google's unauthenticated export URL. .gdoc files on disk are
+// tiny JSON pointers to cloud documents — there's no content locally.
+//
+// Strategy:
+//   1. Parse the JSON, extract doc_id (or scrape from a URL field).
+//   2. Try GET https://docs.google.com/document/d/{id}/export?format=docx
+//   3. If the response is application/vnd.openxmlformats... (real docx
+//      binary), run mammoth on it and return { kind: 'imported', html, ... }.
+//      The renderer handles this exactly like a local .docx import.
+//   4. If the response Content-Type is text/html, the fetch was redirected
+//      to a Google login page — the doc is private and we can't read it
+//      without OAuth. Return { kind: 'auth-required', url: <doc-url> } so
+//      the renderer can fall back to opening in the user's browser.
+//
+// Future Phase 8: full Google Drive OAuth would let private docs open
+// inline too, but that's a registered Google Cloud project + client_id +
+// refresh token storage, which is well outside the scope of "make .gdoc
+// open here when possible."
 ipcMain.handle('fs:readGdoc', async (_event, filePath) => {
     if (!filePath || !fs.existsSync(filePath)) {
         return { ok: false, error: 'File not found.' };
     }
+
+    // 1. Parse the JSON pointer.
+    let docId = null;
+    let docUrl = null;
     try {
         const raw = fs.readFileSync(filePath, 'utf8');
         const data = JSON.parse(raw);
-        // Different macOS versions have written this in slightly different
-        // shapes over the years; check the most common keys.
-        const url = data.url || data.uri || data.doc_id
-            ? (data.url || data.uri || `https://docs.google.com/document/d/${data.doc_id}/edit`)
-            : null;
-        if (!url) {
-            return { ok: false, error: 'No URL found in .gdoc pointer file.' };
+        // Different macOS / Drive versions have written this with different keys.
+        docId = data.doc_id || data.docId || null;
+        docUrl = data.url || data.uri || null;
+        // If we got a URL but no doc_id, try to extract the id from the URL.
+        if (!docId && docUrl) {
+            const m = docUrl.match(/\/document\/d\/([a-zA-Z0-9_-]+)/);
+            if (m) docId = m[1];
         }
-        return { ok: true, url };
+        // If we got a doc_id but no URL, build the canonical edit URL.
+        if (!docUrl && docId) {
+            docUrl = `https://docs.google.com/document/d/${docId}/edit`;
+        }
     } catch (error) {
         return { ok: false, error: `gdoc parse failed: ${error.message}` };
     }
+
+    if (!docId) {
+        return { ok: false, error: 'No doc_id found in .gdoc pointer file.' };
+    }
+
+    // 2. Attempt the unauthenticated docx export.
+    const exportUrl = `https://docs.google.com/document/d/${docId}/export?format=docx`;
+    let response;
+    try {
+        response = await fetch(exportUrl, {
+            method: 'GET',
+            redirect: 'follow',
+            // 30s timeout — large docs take a few seconds to export server-side.
+            signal: AbortSignal.timeout(30000)
+        });
+    } catch (error) {
+        // Network failure — fall back to browser handoff so the user can at
+        // least open the doc somewhere.
+        return { ok: true, kind: 'auth-required', url: docUrl, reason: `Network error: ${error.message}` };
+    }
+
+    // 3. Inspect the response.
+    const contentType = response.headers.get('content-type') || '';
+    const isDocx = contentType.includes('officedocument.wordprocessingml.document')
+        || contentType.includes('application/vnd.openxmlformats');
+
+    if (response.ok && isDocx) {
+        try {
+            const arrayBuffer = await response.arrayBuffer();
+            const buffer = Buffer.from(arrayBuffer);
+            const result = await mammoth.convertToHtml({ buffer });
+            // Best-effort name: use the .gdoc filename minus extension.
+            const baseName = path.basename(filePath, path.extname(filePath));
+            return {
+                ok: true,
+                kind: 'imported',
+                html: result.value || '',
+                messages: (result.messages || []).map(m => ({ type: m.type, message: m.message })),
+                baseName,
+                sourceUrl: docUrl
+            };
+        } catch (error) {
+            return { ok: false, error: `mammoth conversion failed: ${error.message}` };
+        }
+    }
+
+    // 4. Anything else (text/html login redirect, 401, 403, 404, etc.) —
+    //    we cannot fetch the content unauthenticated. Hand the URL back so
+    //    the renderer can fall back to opening it in the browser.
+    return {
+        ok: true,
+        kind: 'auth-required',
+        url: docUrl,
+        reason: `Document is private or requires authentication (HTTP ${response.status}, ${contentType || 'no content-type'})`
+    };
 });
 
 // Open a URL in the user's default browser via Electron's shell module.
