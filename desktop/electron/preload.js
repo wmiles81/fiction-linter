@@ -7,6 +7,8 @@ contextBridge.exposeInMainWorld('api', {
     writeFile: (filePath, contents) => ipcRenderer.invoke('fs:writeFile', { filePath, contents }),
     readDocx: filePath => ipcRenderer.invoke('fs:readDocx', filePath),
     readGdoc: filePath => ipcRenderer.invoke('fs:readGdoc', filePath),
+    gdocAuth: () => ipcRenderer.invoke('gdoc:auth'),
+    gdocSignout: () => ipcRenderer.invoke('gdoc:signout'),
     openExternal: url => ipcRenderer.invoke('shell:openExternal', url),
     getSettings: () => ipcRenderer.invoke('settings:get'),
     saveSettings: settings => ipcRenderer.invoke('settings:set', settings),
