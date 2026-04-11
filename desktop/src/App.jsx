@@ -6,6 +6,7 @@ import SettingsDialog from './components/SettingsDialog';
 import IssueList from './components/IssueList';
 import PanelResizer from './components/PanelResizer';
 import TabBar from './components/TabBar';
+import StatusBar from './components/StatusBar';
 import { useAppStore } from './store/useAppStore';
 import { useEditorStore } from './store/useEditorStore';
 import { useLintStore } from './store/useLintStore';
@@ -37,6 +38,14 @@ function App() {
     const showFindings = useLintStore(state => state.showFindings);
     const issues = useLintStore(state => state.issues);
     const setIssues = useLintStore(state => state.setIssues);
+    const setLintEnabled = useLintStore(state => state.setEnabled);
+    const setShowFindings = useLintStore(state => state.setShowFindings);
+
+    const [editorState, setEditorState] = React.useState({
+        line: 1,
+        column: 1,
+        selection: null
+    });
 
     const [showSettings, setShowSettings] = React.useState(false);
     const [leftPanelWidth, setLeftPanelWidth] = React.useState(() => {
@@ -273,6 +282,7 @@ function App() {
                         issues={visibleIssues}
                         onChange={updateContent}
                         onSave={handleSave}
+                        onStateChange={setEditorState}
                     />
                     <IssueList
                         issues={visibleIssues}
@@ -282,10 +292,19 @@ function App() {
                 </main>
             </div>
 
-            <footer className="status-bar">
-                <span>{status}</span>
-                <span>{visibleIssues.length} findings</span>
-            </footer>
+            <StatusBar
+                status={status}
+                content={content}
+                cursorLine={editorState.line}
+                cursorColumn={editorState.column}
+                selection={editorState.selection}
+                dirty={dirty}
+                issueCount={visibleIssues.length}
+                lintEnabled={lintEnabled}
+                showFindings={showFindings}
+                onToggleLint={() => setLintEnabled(!lintEnabled)}
+                onToggleFindings={() => setShowFindings(!showFindings)}
+            />
 
             {showSettings && settings ? (
                 <SettingsDialog

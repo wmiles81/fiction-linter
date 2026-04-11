@@ -372,10 +372,72 @@ body {
 
 .status-bar {
     display: flex;
+    align-items: center;
     justify-content: space-between;
-    padding: 10px 24px 18px;
-    font-size: 12px;
-    color: var(--muted);
+    padding: 4px 12px;
+    border-top: 1px solid var(--g-border, #d7d2c5);
+    background: var(--g-surface, #faf7f0);
+    font-size: 11px;
+    line-height: 1.2;
+    color: var(--g-text-muted, #6b655b);
+    min-height: 24px;
+}
+
+.status-bar-left,
+.status-bar-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.status-bar-text {
+    font-weight: 500;
+    color: var(--g-text, #2a2620);
+}
+
+.status-bar-dirty {
+    color: var(--g-warning, #b8860b);
+    font-size: 13px;
+}
+
+.status-bar-metric {
+    font-variant-numeric: tabular-nums;
+}
+
+.status-bar-toggle {
+    background: transparent;
+    border: 1px solid var(--g-border, #d7d2c5);
+    color: var(--g-text, #2a2620);
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-size: 11px;
+    cursor: pointer;
+    font-weight: 500;
+}
+
+.status-bar-toggle:hover:not(:disabled) {
+    background: rgba(0, 0, 0, 0.04);
+}
+
+.status-bar-toggle.off {
+    color: var(--g-text-muted, #6b655b);
+    background: transparent;
+}
+
+.status-bar-toggle.on {
+    background: var(--g-accent-bg, #e8f0e8);
+    border-color: var(--g-accent, #4a7a4a);
+    color: var(--g-accent, #4a7a4a);
+}
+
+.status-bar-toggle:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.status-bar-selection {
+    color: var(--g-accent, #4a7a4a);
+    font-weight: 600;
 }
 
 .modal-backdrop {

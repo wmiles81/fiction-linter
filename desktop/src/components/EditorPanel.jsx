@@ -8,6 +8,11 @@ import {
     findingsToDiagnostics
 } from './lintBridge';
 
+function countWordsInSelection(text) {
+    if (!text) return 0;
+    return text.trim().split(/\s+/).filter(Boolean).length;
+}
+
 const editorTheme = EditorView.theme({
     '&': {
         height: '100%',
@@ -26,10 +31,44 @@ const editorTheme = EditorView.theme({
 });
 
 const EditorPanel = forwardRef(function EditorPanel(
-    { file, content, dirty, issues, onChange, onSave },
+    { file, content, dirty, issues, onChange, onSave, onStateChange },
     ref
 ) {
     const viewRef = useRef(null);
+
+    // Keep the latest onStateChange in a ref so the updateListener extension
+    // (built once below) always calls the current handler without us having
+    // to rebuild the extensions array and reinit the CodeMirror instance.
+    const onStateChangeRef = useRef(onStateChange);
+    React.useEffect(() => {
+        onStateChangeRef.current = onStateChange;
+    }, [onStateChange]);
+
+    const stateListener = React.useMemo(
+        () =>
+            EditorView.updateListener.of(update => {
+                if (!update.selectionSet && !update.docChanged) return;
+                const cb = onStateChangeRef.current;
+                if (!cb) return;
+                const { state } = update;
+                const main = state.selection.main;
+                const line = state.doc.lineAt(main.head);
+                let selection = null;
+                if (!main.empty) {
+                    const text = state.sliceDoc(main.from, main.to);
+                    selection = {
+                        chars: text.length,
+                        words: countWordsInSelection(text)
+                    };
+                }
+                cb({
+                    line: line.number,
+                    column: main.head - line.from + 1,
+                    selection
+                });
+            }),
+        []
+    );
 
     useImperativeHandle(ref, () => ({
         jumpTo(finding) {
@@ -77,7 +116,7 @@ const EditorPanel = forwardRef(function EditorPanel(
                     value={content}
                     onChange={onChange}
                     onCreateEditor={handleCreateEditor}
-                    extensions={[markdown(), editorTheme, EditorView.lineWrapping, ...lintBridgeExtensions]}
+                    extensions={[markdown(), editorTheme, EditorView.lineWrapping, stateListener, ...lintBridgeExtensions]}
                     basicSetup={{
                         lineNumbers: true,
                         foldGutter: false,
