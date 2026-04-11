@@ -1,79 +1,31 @@
 import * as vscode from 'vscode';
-import { SPEData } from '../controllers/SPEController';
+import { PatternLinterCore, SPEData, LintFinding } from '../shared/linting';
 
 export class PatternLinter {
+    private core = new PatternLinterCore();
+
     public lint(document: vscode.TextDocument, data: SPEData): vscode.Diagnostic[] {
-        const diagnostics: vscode.Diagnostic[] = [];
-        const text = document.getText();
-
-        // 1. Check Cliche Collider
-        if (data.cliches) {
-            diagnostics.push(...this.checkCategory(text, data.cliches.somatic_cliches, 'Somatic Cliche', vscode.DiagnosticSeverity.Warning, document));
-            diagnostics.push(...this.checkCategory(text, data.cliches.overused_adjectives_adverbs, 'Overused Adjective/Adverb', vscode.DiagnosticSeverity.Information, document));
-            diagnostics.push(...this.checkCategory(text, data.cliches.weak_descriptors, 'Weak Descriptor', vscode.DiagnosticSeverity.Information, document));
-            diagnostics.push(...this.checkCategory(text, data.cliches.emotion_tells, 'Emotion Tell', vscode.DiagnosticSeverity.Warning, document));
-            diagnostics.push(...this.checkCategory(text, data.cliches.purple_prose, 'Purple Prose', vscode.DiagnosticSeverity.Warning, document));
-            diagnostics.push(...this.checkCategory(text, data.cliches.banned_cliches?.patterns, 'Banned Cliche', vscode.DiagnosticSeverity.Error, document));
-            diagnostics.push(...this.checkCategory(text, data.cliches.ai_structural_patterns?.patterns, 'AI Structural Pattern', vscode.DiagnosticSeverity.Error, document));
-
-            // Similes specific - Count total
-            const simileDiagnostics = this.checkCategory(text, data.cliches.similes?.patterns, 'Simile Detection', vscode.DiagnosticSeverity.Information, document);
-            if (simileDiagnostics.length > 0) {
-                const totalSimiles = simileDiagnostics.length;
-                simileDiagnostics.forEach(d => {
-                    d.message = `${d.message} (Total: ${totalSimiles})`;
-                });
-                diagnostics.push(...simileDiagnostics);
-            }
-        }
-
-        return diagnostics;
+        const findings = this.core.lintText(document.getText(), data);
+        return findings.map(finding => this.toDiagnostic(document, finding));
     }
 
-    private checkCategory(text: string, items: any[], categoryInfo: string, severity: vscode.DiagnosticSeverity, document: vscode.TextDocument): vscode.Diagnostic[] {
-        const diagnostics: vscode.Diagnostic[] = [];
-        if (!items || !Array.isArray(items)) return diagnostics;
-
-        for (const item of items) {
-            const pattern = item.phrase || item.pattern;
-            if (!pattern) continue;
-
-            const regex = new RegExp(`\\b${this.escapeRegExp(pattern)}\\b`, 'gi');
-            let match;
-            while ((match = regex.exec(text)) !== null) {
-                // Check for exclude_dialogue flag
-                if (item.exclude_dialogue && this.isInsideQuotes(match.index, text)) {
-                    continue;
-                }
-
-                const startPos = document.positionAt(match.index);
-                const endPos = document.positionAt(match.index + match[0].length);
-                const range = new vscode.Range(startPos, endPos);
-
-                const message = `${categoryInfo}: "${pattern}". Penalty: ${item.penalty_score || 'N/A'}. ${item.suggested_fix ? 'Fix: ' + item.suggested_fix : ''}`;
-                const diagnostic = new vscode.Diagnostic(range, message, severity);
-                diagnostic.source = 'Fiction Linter';
-                diagnostics.push(diagnostic);
-            }
-        }
-        return diagnostics;
+    private toDiagnostic(document: vscode.TextDocument, finding: LintFinding): vscode.Diagnostic {
+        const startPos = document.positionAt(finding.start);
+        const endPos = document.positionAt(finding.end);
+        const range = new vscode.Range(startPos, endPos);
+        const diagnostic = new vscode.Diagnostic(range, finding.message, this.mapSeverity(finding));
+        diagnostic.source = finding.source || 'Fiction Linter';
+        return diagnostic;
     }
 
-    private isInsideQuotes(index: number, text: string): boolean {
-        let quoteCount = 0;
-        // Simple parity check: count quotes from start of paragraph (or text) to index.
-        const lastNewline = text.lastIndexOf('\n', index);
-        const searchStart = lastNewline === -1 ? 0 : lastNewline;
-
-        for (let i = searchStart; i < index; i++) {
-            if (text[i] === '"' || text[i] === '“' || text[i] === '”') {
-                quoteCount++;
-            }
+    private mapSeverity(finding: LintFinding): vscode.DiagnosticSeverity {
+        switch (finding.severity) {
+            case 'error':
+                return vscode.DiagnosticSeverity.Error;
+            case 'warning':
+                return vscode.DiagnosticSeverity.Warning;
+            default:
+                return vscode.DiagnosticSeverity.Information;
         }
-        return quoteCount % 2 !== 0;
-    }
-
-    private escapeRegExp(string: string) {
-        return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // $& means the whole matched string
     }
 }

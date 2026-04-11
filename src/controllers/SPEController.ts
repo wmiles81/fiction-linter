@@ -2,13 +2,7 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as yaml from 'js-yaml';
-
-export interface SPEData {
-    cliches: any;
-    names: any;
-    places: any;
-    protocols: any;
-}
+import { SPEData } from '../shared/linting';
 
 export class SPEController {
     private spePath: string = '';
