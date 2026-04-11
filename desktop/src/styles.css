@@ -16,8 +16,21 @@
     box-sizing: border-box;
 }
 
+/*
+ * Anchor the height chain so the app fills the viewport exactly and never
+ * scrolls the document itself. Inner panels (.tree-root, .editor-surface)
+ * own their own scrollbars. Without this anchoring, the flex/grid `1fr`
+ * tracks below fall back to "size to content" and the whole window expands.
+ */
+html,
+body,
+#root {
+    height: 100vh;
+}
+
 body {
     margin: 0;
+    overflow: hidden;
     font-family: 'Space Grotesk', system-ui, sans-serif;
     background: radial-gradient(circle at top left, var(--bg-2), var(--bg-1) 55%, #fbe9dd 100%);
     color: var(--ink);
@@ -25,7 +38,7 @@ body {
 }
 
 .app-shell {
-    min-height: 100vh;
+    height: 100%;
     display: flex;
     flex-direction: column;
 }
@@ -275,6 +288,10 @@ body {
     padding: 18px 20px 22px;
     box-shadow: var(--shadow);
     animation: riseFade 0.6s ease;
+    /* Cap height in the grid auto track so a long issues list does not
+     * push the editor row to zero. Internal scroll for overflow. */
+    max-height: 30vh;
+    overflow-y: auto;
 }
 
 .issues-panel h3 {
