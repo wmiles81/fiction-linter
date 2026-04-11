@@ -1,6 +1,7 @@
 const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const yaml = require('js-yaml');
 
 const SETTINGS_FILE = 'settings.json';
 
@@ -167,4 +168,33 @@ ipcMain.handle('settings:get', async () => {
 
 ipcMain.handle('settings:set', async (_event, settings) => {
     return writeSettings(settings || {});
+});
+
+const SPE_FILES = [
+    { key: 'cliches', name: 'cliche_collider.yaml' },
+    { key: 'names', name: 'name_collider.yaml' },
+    { key: 'places', name: 'place_collider.yaml' },
+    { key: 'protocols', name: 'line_editing_protocol.yaml' }
+];
+
+ipcMain.handle('spe:load', async (_event, spePath) => {
+    const empty = { cliches: {}, names: {}, places: {}, protocols: {} };
+    if (!spePath || !fs.existsSync(spePath)) {
+        return empty;
+    }
+
+    const result = { ...empty };
+    for (const file of SPE_FILES) {
+        const filePath = path.join(spePath, file.name);
+        if (!fs.existsSync(filePath)) continue;
+        try {
+            const contents = fs.readFileSync(filePath, 'utf8');
+            result[file.key] = yaml.load(contents) || {};
+        } catch (error) {
+            // Preserve empty default for this key; log to main console.
+            console.error(`spe:load failed for ${file.name}:`, error);
+            result[file.key] = {};
+        }
+    }
+    return result;
 });

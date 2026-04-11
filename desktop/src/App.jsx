@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import yaml from 'js-yaml';
 import { PatternLinterCore, NameValidatorCore } from '@shared/linting';
 import FileTree from './components/FileTree';
 import EditorPanel from './components/EditorPanel';
@@ -36,7 +35,7 @@ function App() {
 
     useEffect(() => {
         if (!settings?.spePath) return;
-        loadSpeData(settings.spePath).then(setSpeData);
+        window.api.loadSpeData(settings.spePath).then(setSpeData);
     }, [settings?.spePath]);
 
     useEffect(() => {
@@ -236,44 +235,12 @@ function findNode(nodes, nodePath) {
     return null;
 }
 
-async function loadSpeData(spePath) {
-    const files = [
-        { key: 'cliches', name: 'cliche_collider.yaml' },
-        { key: 'names', name: 'name_collider.yaml' },
-        { key: 'places', name: 'place_collider.yaml' },
-        { key: 'protocols', name: 'line_editing_protocol.yaml' }
-    ];
-
-    const result = { ...emptyData };
-
-    for (const file of files) {
-        const response = await window.api.readFile(joinPath(spePath, file.name));
-        if (!response.ok) {
-            continue;
-        }
-        try {
-            result[file.key] = yaml.load(response.contents) || {};
-        } catch (error) {
-            result[file.key] = {};
-        }
-    }
-
-    return result;
-}
-
 function indexToLineCol(text, index) {
     const slice = text.slice(0, index);
     const lines = slice.split('\n');
     const line = lines.length;
     const column = lines[lines.length - 1].length + 1;
     return { line, column };
-}
-
-function joinPath(basePath, leaf) {
-    if (!basePath) return leaf;
-    const needsSeparator = !basePath.endsWith('/') && !basePath.endsWith('\\');
-    const separator = basePath.includes('\\') ? '\\' : '/';
-    return `${basePath}${needsSeparator ? separator : ''}${leaf}`;
 }
 
 export default App;
