@@ -20,6 +20,7 @@ export default defineConfig({
         setupFiles: ['./src/test/setup.js'],
         include: [
             'src/**/*.{test,spec}.{js,jsx,ts,tsx}',
+            'electron/**/*.{test,spec}.{js,jsx,ts,tsx}',
             '../src/shared/**/*.{test,spec}.{ts,tsx}'
         ],
         coverage: {

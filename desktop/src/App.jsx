@@ -126,6 +126,34 @@ function App() {
         editorRef.current?.jumpTo(issue);
     };
 
+    const getSnippet = issue => {
+        // Extract the surrounding sentence for the finding. A "sentence" here is
+        // a simple heuristic: from the previous sentence terminator (., !, ?, \n)
+        // to the next one. Good enough for an AI prompt.
+        const before = content.slice(0, issue.start);
+        const after = content.slice(issue.end);
+
+        const prevBreak = Math.max(
+            before.lastIndexOf('. '),
+            before.lastIndexOf('! '),
+            before.lastIndexOf('? '),
+            before.lastIndexOf('\n')
+        );
+        const nextBreak = (() => {
+            const candidates = [
+                after.indexOf('. '),
+                after.indexOf('! '),
+                after.indexOf('? '),
+                after.indexOf('\n')
+            ].filter(i => i !== -1);
+            return candidates.length ? Math.min(...candidates) : after.length;
+        })();
+
+        const startIdx = prevBreak === -1 ? 0 : prevBreak + 2;
+        const endIdx = issue.end + nextBreak + 1;
+        return content.slice(startIdx, Math.min(endIdx, content.length)).trim();
+    };
+
     return (
         <div className="app-shell">
             <header className="top-bar">
@@ -182,7 +210,7 @@ function App() {
                         }}
                         onSave={handleSave}
                     />
-                    <IssueList issues={issues} onJump={handleJumpToIssue} />
+                    <IssueList issues={issues} onJump={handleJumpToIssue} getSnippet={getSnippet} />
                 </main>
             </div>
 

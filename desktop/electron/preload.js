@@ -7,5 +7,6 @@ contextBridge.exposeInMainWorld('api', {
     writeFile: (filePath, contents) => ipcRenderer.invoke('fs:writeFile', { filePath, contents }),
     getSettings: () => ipcRenderer.invoke('settings:get'),
     saveSettings: settings => ipcRenderer.invoke('settings:set', settings),
-    loadSpeData: spePath => ipcRenderer.invoke('spe:load', spePath)
+    loadSpeData: spePath => ipcRenderer.invoke('spe:load', spePath),
+    aiComplete: payload => ipcRenderer.invoke('ai:complete', payload)
 });

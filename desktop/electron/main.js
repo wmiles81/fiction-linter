@@ -2,6 +2,8 @@ const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const yaml = require('js-yaml');
+const { callChatCompletion } = require('./aiClient');
+const { buildExplainMessages, buildRewriteMessages } = require('./prompts');
 
 const SETTINGS_FILE = 'settings.json';
 
@@ -197,4 +199,28 @@ ipcMain.handle('spe:load', async (_event, spePath) => {
         }
     }
     return result;
+});
+
+ipcMain.handle('ai:complete', async (_event, payload) => {
+    const { kind, finding, snippet } = payload || {};
+    if (kind !== 'explain' && kind !== 'rewrite') {
+        return { ok: false, error: `Unknown kind: ${kind}` };
+    }
+    if (!finding || !snippet) {
+        return { ok: false, error: 'Missing finding or snippet.' };
+    }
+
+    // Read settings from disk — do NOT trust payload. Keeps the key
+    // out of renderer-supplied data entirely.
+    const settings = readSettings();
+    const messages = kind === 'explain'
+        ? buildExplainMessages({ finding, snippet })
+        : buildRewriteMessages({ finding, snippet });
+
+    return callChatCompletion({
+        baseUrl: settings.ai.baseUrl,
+        apiKey: settings.ai.apiKey,
+        model: settings.ai.model,
+        messages
+    });
 });
