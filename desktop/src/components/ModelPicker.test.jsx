@@ -161,4 +161,100 @@ describe('ModelPicker', () => {
         // React fires multiple change events as the user types; we check that the last call had 0.5
         expect(onChange).toHaveBeenCalled();
     });
+
+    it('sorts models by full ID (groups by provider for slash-prefixed IDs)', () => {
+        const unsortedModels = [
+            {
+                id: 'openai/o1',
+                name: 'o1',
+                pricing: { input: 15, output: 60 },
+                supportedParameters: new Set(),
+                isThinking: true
+            },
+            {
+                id: 'anthropic/claude-sonnet-4-5',
+                name: 'Claude Sonnet 4.5',
+                pricing: { input: 3, output: 15 },
+                supportedParameters: new Set(),
+                isThinking: false
+            },
+            {
+                id: 'openai/gpt-4.1-mini',
+                name: 'GPT 4.1 Mini',
+                pricing: { input: 0.4, output: 1.6 },
+                supportedParameters: new Set(),
+                isThinking: false
+            },
+            {
+                id: 'anthropic/claude-opus-4-5',
+                name: 'Claude Opus 4.5',
+                pricing: { input: 15, output: 75 },
+                supportedParameters: new Set(),
+                isThinking: false
+            }
+        ];
+
+        const { container } = render(
+            <ModelPicker
+                provider="openrouter"
+                baseUrl=""
+                apiKey=""
+                models={unsortedModels}
+                selectedModel=""
+                hyperparameters={{}}
+                onSelectModel={() => {}}
+                onChangeHyperparameters={() => {}}
+                loading={false}
+                error={null}
+            />
+        );
+
+        const renderedIds = Array.from(container.querySelectorAll('[data-model-id]'))
+            .map(el => el.getAttribute('data-model-id'));
+
+        // Expected order: anthropic models first (alphabetical), then openai
+        // models. Within each provider, alphabetical.
+        expect(renderedIds).toEqual([
+            'anthropic/claude-opus-4-5',
+            'anthropic/claude-sonnet-4-5',
+            'openai/gpt-4.1-mini',
+            'openai/o1'
+        ]);
+    });
+
+    it('sorts unprefixed model IDs alphabetically', () => {
+        // Direct OpenAI / Anthropic / Ollama fetches return models with no
+        // provider prefix. They should still sort alphabetically by name.
+        const unprefixedModels = [
+            { id: 'o3', name: 'o3', pricing: {}, supportedParameters: new Set(), isThinking: true },
+            { id: 'gpt-4.1-mini', name: 'gpt-4.1-mini', pricing: {}, supportedParameters: new Set(), isThinking: false },
+            { id: 'gpt-4o', name: 'gpt-4o', pricing: {}, supportedParameters: new Set(), isThinking: false },
+            { id: 'o1-mini', name: 'o1-mini', pricing: {}, supportedParameters: new Set(), isThinking: true }
+        ];
+
+        const { container } = render(
+            <ModelPicker
+                provider="openai"
+                baseUrl=""
+                apiKey=""
+                models={unprefixedModels}
+                selectedModel=""
+                hyperparameters={{}}
+                onSelectModel={() => {}}
+                onChangeHyperparameters={() => {}}
+                loading={false}
+                error={null}
+            />
+        );
+
+        const renderedIds = Array.from(container.querySelectorAll('[data-model-id]'))
+            .map(el => el.getAttribute('data-model-id'));
+
+        expect(renderedIds).toEqual([
+            'gpt-4.1-mini',
+            'gpt-4o',
+            'o1-mini',
+            'o3'
+        ]);
+    });
 });

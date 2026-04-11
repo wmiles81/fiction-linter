@@ -26,9 +26,19 @@ function ModelPicker({
     loading,
     error
 }) {
+    // Sort models by full ID. For OpenRouter-style "provider/model" IDs this
+    // groups models by provider AND sorts within each provider in one pass
+    // (because the slash-prefix sorts alphabetically). For direct OpenAI /
+    // Anthropic / Ollama fetches the IDs are unprefixed model names so the
+    // sort gives a flat alphabetical list — also what users expect.
+    const sortedModels = useMemo(
+        () => [...(models || [])].sort((a, b) => a.id.localeCompare(b.id)),
+        [models]
+    );
+
     const selected = useMemo(
-        () => models.find(m => m.id === selectedModel),
-        [models, selectedModel]
+        () => sortedModels.find(m => m.id === selectedModel),
+        [sortedModels, selectedModel]
     );
 
     const handleParamChange = (key, rawValue) => {
@@ -46,10 +56,10 @@ function ModelPicker({
             </div>
 
             <div className="model-listbox" role="listbox" aria-label="Model list">
-                {models.length === 0 && !loading && !error ? (
+                {sortedModels.length === 0 && !loading && !error ? (
                     <div className="model-listbox-empty">Enter an API key and refresh to load models.</div>
                 ) : null}
-                {models.map(m => {
+                {sortedModels.map(m => {
                     const isSelected = m.id === selectedModel;
                     const classes = [
                         'model-row',
