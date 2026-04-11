@@ -1,33 +1,49 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { PatternLinterCore, NameValidatorCore } from '@shared/linting';
 import FileTree from './components/FileTree';
 import EditorPanel from './components/EditorPanel';
 import SettingsDialog from './components/SettingsDialog';
 import IssueList from './components/IssueList';
 import PanelResizer from './components/PanelResizer';
-
-const emptyData = {
-    cliches: {},
-    names: {},
-    places: {},
-    protocols: {}
-};
+import { useAppStore } from './store/useAppStore';
+import { useEditorStore } from './store/useEditorStore';
+import { useLintStore } from './store/useLintStore';
 
 function App() {
-    const [rootPath, setRootPath] = useState('');
-    const [tree, setTree] = useState([]);
-    const [currentFile, setCurrentFile] = useState(null);
-    const [content, setContent] = useState('');
-    const [dirty, setDirty] = useState(false);
-    const [settings, setSettings] = useState(null);
-    const [speData, setSpeData] = useState(emptyData);
-    const [issues, setIssues] = useState([]);
-    const [showSettings, setShowSettings] = useState(false);
-    const [status, setStatus] = useState('Ready');
+    const settings = useAppStore(state => state.settings);
+    const speData = useAppStore(state => state.speData);
+    const status = useAppStore(state => state.status);
+    const rootPath = useAppStore(state => state.rootPath);
+    const tree = useAppStore(state => state.tree);
+    const setSettings = useAppStore(state => state.setSettings);
+    const setSpeData = useAppStore(state => state.setSpeData);
+    const setStatus = useAppStore(state => state.setStatus);
+    const setRootPath = useAppStore(state => state.setRootPath);
+    const setTree = useAppStore(state => state.setTree);
+    const updateNode = useAppStore(state => state.updateNode);
+
+    const tabs = useEditorStore(state => state.tabs);
+    const activeTabId = useEditorStore(state => state.activeTabId);
+    const openFile = useEditorStore(state => state.openFile);
+    const updateContent = useEditorStore(state => state.updateContent);
+    const markSaved = useEditorStore(state => state.markSaved);
+
+    const lintEnabled = useLintStore(state => state.enabled);
+    const showFindings = useLintStore(state => state.showFindings);
+    const issues = useLintStore(state => state.issues);
+    const setIssues = useLintStore(state => state.setIssues);
+
+    const [showSettings, setShowSettings] = React.useState(false);
     const [leftPanelWidth, setLeftPanelWidth] = React.useState(() => {
         if (typeof window === 'undefined') return 260;
-        const stored = window.localStorage.getItem('fl.leftPanelWidth');
-        return stored ? Math.max(160, parseInt(stored, 10)) : 260;
+        try {
+            const stored = window.localStorage.getItem('fl.leftPanelWidth');
+            return stored ? Math.max(160, parseInt(stored, 10)) : 260;
+        } catch {
+            // Locked-down environments (private mode, storage disabled, etc.)
+            // — fall back to the default width.
+            return 260;
+        }
     });
 
     const handleResize = (newWidth) => {
@@ -42,17 +58,26 @@ function App() {
     const patternCore = useMemo(() => new PatternLinterCore(), []);
     const nameCore = useMemo(() => new NameValidatorCore(), []);
 
+    // Derived from the active tab — the Phase 0-6 "currentFile/content/dirty"
+    // trio now lives inside useEditorStore's tabs[].
+    const activeTab = tabs.find(t => t.id === activeTabId) ?? null;
+    const content = activeTab?.markdownSource ?? '';
+    const currentFile = activeTab
+        ? { name: activeTab.name, path: activeTab.path }
+        : null;
+    const dirty = activeTab?.dirty ?? false;
+
     useEffect(() => {
         window.api.getSettings().then(setSettings);
-    }, []);
+    }, [setSettings]);
 
     useEffect(() => {
         if (!settings?.spePath) return;
         window.api.loadSpeData(settings.spePath).then(setSpeData);
-    }, [settings?.spePath]);
+    }, [settings?.spePath, setSpeData]);
 
     useEffect(() => {
-        if (!content || !settings) {
+        if (!lintEnabled || !content || !settings) {
             setIssues([]);
             return;
         }
@@ -64,11 +89,11 @@ function App() {
             ];
 
             const mapped = findings.map(finding => {
-                const start = indexToLineCol(content, finding.start);
+                const loc = indexToLineCol(content, finding.start);
                 return {
                     ...finding,
-                    line: start.line,
-                    column: start.column
+                    line: loc.line,
+                    column: loc.column
                 };
             });
 
@@ -76,7 +101,7 @@ function App() {
         }, 300);
 
         return () => clearTimeout(handle);
-    }, [content, speData, patternCore, nameCore, settings]);
+    }, [lintEnabled, content, speData, patternCore, nameCore, settings, setIssues]);
 
     const handleChooseFolder = async () => {
         const selected = await window.api.chooseFolder();
@@ -91,18 +116,16 @@ function App() {
         if (!target || !target.isDirectory) return;
 
         if (target.children) {
-            setTree(prev => updateNode(prev, nodePath, node => ({ ...node, expanded: !node.expanded })));
+            updateNode(nodePath, node => ({ ...node, expanded: !node.expanded }));
             return;
         }
 
         const entries = await window.api.listDirectory(target.path);
-        setTree(prev =>
-            updateNode(prev, nodePath, node => ({
-                ...node,
-                expanded: true,
-                children: buildNodes(entries)
-            }))
-        );
+        updateNode(nodePath, node => ({
+            ...node,
+            expanded: true,
+            children: buildNodes(entries)
+        }));
     };
 
     const handleSelectFile = async node => {
@@ -112,17 +135,19 @@ function App() {
             setStatus(result.error || 'Unable to read file.');
             return;
         }
+        openFile({
+            path: node.path,
+            name: node.name,
+            markdownSource: result.contents
+        });
         setStatus('Loaded file.');
-        setCurrentFile({ name: node.name, path: node.path });
-        setContent(result.contents);
-        setDirty(false);
     };
 
     const handleSave = async () => {
-        if (!currentFile) return;
-        const result = await window.api.writeFile(currentFile.path, content);
+        if (!activeTab?.path) return;
+        const result = await window.api.writeFile(activeTab.path, activeTab.markdownSource);
         if (result.ok) {
-            setDirty(false);
+            markSaved();
             setStatus('Saved.');
         } else {
             setStatus(result.error || 'Save failed.');
@@ -166,6 +191,8 @@ function App() {
         const endIdx = issue.end + nextBreak + 1;
         return content.slice(startIdx, Math.min(endIdx, content.length)).trim();
     };
+
+    const visibleIssues = showFindings ? issues : [];
 
     return (
         <div className="app-shell">
@@ -227,22 +254,21 @@ function App() {
                         file={currentFile}
                         content={content}
                         dirty={dirty}
-                        issues={issues}
-                        onChange={value => {
-                            setContent(value);
-                            if (currentFile) {
-                                setDirty(true);
-                            }
-                        }}
+                        issues={visibleIssues}
+                        onChange={updateContent}
                         onSave={handleSave}
                     />
-                    <IssueList issues={issues} onJump={handleJumpToIssue} getSnippet={getSnippet} />
+                    <IssueList
+                        issues={visibleIssues}
+                        onJump={handleJumpToIssue}
+                        getSnippet={getSnippet}
+                    />
                 </main>
             </div>
 
             <footer className="status-bar">
                 <span>{status}</span>
-                <span>{issues.length} findings</span>
+                <span>{visibleIssues.length} findings</span>
             </footer>
 
             {showSettings && settings ? (
@@ -262,18 +288,6 @@ function buildNodes(entries) {
         expanded: false,
         children: null
     }));
-}
-
-function updateNode(nodes, nodePath, updater) {
-    return nodes.map(node => {
-        if (node.path === nodePath) {
-            return updater(node);
-        }
-        if (node.children) {
-            return { ...node, children: updateNode(node.children, nodePath, updater) };
-        }
-        return node;
-    });
 }
 
 function findNode(nodes, nodePath) {
