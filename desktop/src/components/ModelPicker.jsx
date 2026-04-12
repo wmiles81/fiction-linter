@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 
 const PARAM_CONFIGS = {
     temperature: { label: 'Temperature', type: 'number', step: 0.01, min: 0, max: 2 },
@@ -17,6 +17,14 @@ function formatPrice(p) {
     return `$${p.toFixed(2)}`;
 }
 
+// A model is considered free when BOTH input and output are $0. OpenRouter
+// labels many previewing/test foundation models at $0/$0 — these are often
+// the best available models for the task, so the UI should surface them
+// prominently instead of hiding them in a sea of $0.00 / $0.00 rows.
+function isFreeModel(m) {
+    return m?.pricing?.input === 0 && m?.pricing?.output === 0;
+}
+
 function ModelPicker({
     models,
     selectedModel,
@@ -26,13 +34,30 @@ function ModelPicker({
     loading,
     error
 }) {
+    const [freeOnly, setFreeOnly] = useState(false);
+
     // Sort models by full ID. For OpenRouter-style "provider/model" IDs this
     // groups models by provider AND sorts within each provider in one pass
     // (because the slash-prefix sorts alphabetically). For direct OpenAI /
     // Anthropic / Ollama fetches the IDs are unprefixed model names so the
     // sort gives a flat alphabetical list — also what users expect.
-    const sortedModels = useMemo(
-        () => [...(models || [])].sort((a, b) => a.id.localeCompare(b.id)),
+    //
+    // When freeOnly is on, filter to $0/$0 models. When OFF, free models
+    // still bubble to the top via a secondary sort so a user scanning the
+    // list spots them without having to scroll past paid ones first.
+    const sortedModels = useMemo(() => {
+        const base = [...(models || [])];
+        const filtered = freeOnly ? base.filter(isFreeModel) : base;
+        return filtered.sort((a, b) => {
+            const aFree = isFreeModel(a);
+            const bFree = isFreeModel(b);
+            if (aFree !== bFree) return aFree ? -1 : 1;
+            return a.id.localeCompare(b.id);
+        });
+    }, [models, freeOnly]);
+
+    const freeCount = useMemo(
+        () => (models || []).filter(isFreeModel).length,
         [models]
     );
 
@@ -51,20 +76,36 @@ function ModelPicker({
         <div className="model-picker">
             <div className="model-picker-header">
                 <span>Model</span>
+                {freeCount > 0 ? (
+                    <label className="model-picker-filter" title="Show only models with $0 prompt and $0 completion pricing">
+                        <input
+                            type="checkbox"
+                            checked={freeOnly}
+                            onChange={e => setFreeOnly(e.target.checked)}
+                        />
+                        <span>Free only ({freeCount})</span>
+                    </label>
+                ) : null}
                 {loading ? <span className="model-picker-loading">Loading…</span> : null}
                 {error ? <span className="model-picker-error">{error}</span> : null}
             </div>
 
             <div className="model-listbox" role="listbox" aria-label="Model list">
                 {sortedModels.length === 0 && !loading && !error ? (
-                    <div className="model-listbox-empty">Enter an API key and refresh to load models.</div>
+                    <div className="model-listbox-empty">
+                        {freeOnly
+                            ? 'No free models available from this provider.'
+                            : 'Enter an API key and refresh to load models.'}
+                    </div>
                 ) : null}
                 {sortedModels.map(m => {
                     const isSelected = m.id === selectedModel;
+                    const free = isFreeModel(m);
                     const classes = [
                         'model-row',
                         isSelected ? 'selected' : '',
-                        m.isThinking ? 'thinking' : ''
+                        m.isThinking ? 'thinking' : '',
+                        free ? 'free' : ''
                     ].filter(Boolean).join(' ');
                     return (
                         <div
@@ -76,9 +117,13 @@ function ModelPicker({
                             onClick={() => onSelectModel(m.id)}
                         >
                             <span className="model-row-id">{m.id}</span>
-                            <span className="model-row-price">
-                                {formatPrice(m.pricing?.input)} / {formatPrice(m.pricing?.output)}
-                            </span>
+                            {free ? (
+                                <span className="model-row-badge free-badge">FREE</span>
+                            ) : (
+                                <span className="model-row-price">
+                                    {formatPrice(m.pricing?.input)} / {formatPrice(m.pricing?.output)}
+                                </span>
+                            )}
                         </div>
                     );
                 })}

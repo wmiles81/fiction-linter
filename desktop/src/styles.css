@@ -701,6 +701,42 @@ body {
     color: var(--g-accent, #4a7a4a);
 }
 
+.model-picker-filter {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--g-text-muted, #6b655b);
+    cursor: pointer;
+    user-select: none;
+    margin-left: auto;
+}
+
+.model-picker-filter input[type="checkbox"] {
+    margin: 0;
+    cursor: pointer;
+}
+
+.model-row-badge {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-variant-numeric: tabular-nums;
+}
+
+.free-badge {
+    background: var(--g-accent, #4a7a4a);
+    color: #fff;
+}
+
+.model-row.selected .free-badge {
+    background: #fff;
+    color: var(--g-accent, #4a7a4a);
+}
+
 .hyperparameter-panel {
     margin-top: 12px;
     padding: 10px 12px;

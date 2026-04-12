@@ -222,6 +222,131 @@ describe('ModelPicker', () => {
         ]);
     });
 
+    it('shows a FREE badge for models priced at $0 input and $0 output', () => {
+        const modelsWithFree = [
+            {
+                id: 'openrouter/free-preview-model',
+                name: 'Free Preview',
+                pricing: { input: 0, output: 0 },
+                supportedParameters: new Set(),
+                isThinking: false
+            },
+            {
+                id: 'openai/gpt-4.1-mini',
+                name: 'GPT 4.1 Mini',
+                pricing: { input: 0.4, output: 1.6 },
+                supportedParameters: new Set(),
+                isThinking: false
+            }
+        ];
+        render(
+            <ModelPicker
+                provider="openrouter" baseUrl="" apiKey=""
+                models={modelsWithFree}
+                selectedModel=""
+                hyperparameters={{}}
+                onSelectModel={() => {}}
+                onChangeHyperparameters={() => {}}
+                loading={false} error={null}
+            />
+        );
+        expect(screen.getByText('FREE')).toBeInTheDocument();
+        // Paid model still shows price text
+        expect(screen.getByText('$0.40 / $1.60')).toBeInTheDocument();
+    });
+
+    it('bubbles free models to the top of the unfiltered list', () => {
+        const mixedModels = [
+            {
+                id: 'openai/gpt-4.1-mini',
+                name: 'GPT 4.1 Mini',
+                pricing: { input: 0.4, output: 1.6 },
+                supportedParameters: new Set(),
+                isThinking: false
+            },
+            {
+                id: 'aaa/free-preview',
+                name: 'Free preview',
+                pricing: { input: 0, output: 0 },
+                supportedParameters: new Set(),
+                isThinking: false
+            },
+            {
+                id: 'zzz/another-free',
+                name: 'Another free',
+                pricing: { input: 0, output: 0 },
+                supportedParameters: new Set(),
+                isThinking: false
+            }
+        ];
+        const { container } = render(
+            <ModelPicker
+                provider="openrouter" baseUrl="" apiKey=""
+                models={mixedModels}
+                selectedModel=""
+                hyperparameters={{}}
+                onSelectModel={() => {}}
+                onChangeHyperparameters={() => {}}
+                loading={false} error={null}
+            />
+        );
+        const renderedIds = Array.from(container.querySelectorAll('[data-model-id]'))
+            .map(el => el.getAttribute('data-model-id'));
+        expect(renderedIds).toEqual([
+            'aaa/free-preview',
+            'zzz/another-free',
+            'openai/gpt-4.1-mini'
+        ]);
+    });
+
+    it('free-only toggle filters to $0 models and shows count in label', async () => {
+        const user = userEvent.setup();
+        const mixedModels = [
+            { id: 'free/a', name: 'A', pricing: { input: 0, output: 0 }, supportedParameters: new Set(), isThinking: false },
+            { id: 'free/b', name: 'B', pricing: { input: 0, output: 0 }, supportedParameters: new Set(), isThinking: false },
+            { id: 'paid/x', name: 'X', pricing: { input: 1, output: 2 }, supportedParameters: new Set(), isThinking: false }
+        ];
+        const { container } = render(
+            <ModelPicker
+                provider="openrouter" baseUrl="" apiKey=""
+                models={mixedModels}
+                selectedModel=""
+                hyperparameters={{}}
+                onSelectModel={() => {}}
+                onChangeHyperparameters={() => {}}
+                loading={false} error={null}
+            />
+        );
+        // Label shows count of free models
+        expect(screen.getByText(/Free only \(2\)/i)).toBeInTheDocument();
+        // Before filtering: all three rows
+        expect(container.querySelectorAll('[data-model-id]')).toHaveLength(3);
+        // Toggle on
+        await user.click(screen.getByRole('checkbox'));
+        // After filtering: only the free two
+        const filteredIds = Array.from(container.querySelectorAll('[data-model-id]'))
+            .map(el => el.getAttribute('data-model-id'));
+        expect(filteredIds).toEqual(['free/a', 'free/b']);
+    });
+
+    it('hides free-only filter when no free models exist', () => {
+        const onlyPaid = [
+            { id: 'paid/x', name: 'X', pricing: { input: 1, output: 2 }, supportedParameters: new Set(), isThinking: false }
+        ];
+        render(
+            <ModelPicker
+                provider="openrouter" baseUrl="" apiKey=""
+                models={onlyPaid}
+                selectedModel=""
+                hyperparameters={{}}
+                onSelectModel={() => {}}
+                onChangeHyperparameters={() => {}}
+                loading={false} error={null}
+            />
+        );
+        expect(screen.queryByText(/Free only/i)).not.toBeInTheDocument();
+    });
+
     it('sorts unprefixed model IDs alphabetically', () => {
         // Direct OpenAI / Anthropic / Ollama fetches return models with no
         // provider prefix. They should still sort alphabetically by name.
