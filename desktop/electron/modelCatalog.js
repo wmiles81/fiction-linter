@@ -47,8 +47,10 @@ async function fetchOpenRouterModels({ baseUrl, apiKey }) {
             },
             supportedParameters: new Set(m.supported_parameters || []),
             isThinking: Array.isArray(m.supported_parameters) && m.supported_parameters.includes('reasoning'),
-            contextLength: m.context_length ?? m.top_provider?.context_length ?? null,
-            created: typeof m.created === 'number' ? m.created : null
+            contextLength: toFiniteNumber(m.context_length ?? m.top_provider?.context_length),
+            // OpenRouter sometimes returns created as a number, sometimes as a
+            // numeric string. Accept both; anything that coerces to NaN -> null.
+            created: toFiniteNumber(m.created)
         }));
         return { ok: true, models };
     } catch (err) {
@@ -77,7 +79,7 @@ async function fetchOpenAIModels({ baseUrl, apiKey }) {
                 supportedParameters: inferOpenAIParameters(m.id),
                 isThinking: isReasoning,
                 contextLength: OPENAI_CONTEXT[m.id] || null,
-                created: typeof m.created === 'number' ? m.created : null
+                created: toFiniteNumber(m.created)
             };
         });
         return { ok: true, models };
@@ -196,6 +198,17 @@ async function fetchOllamaModels({ baseUrl }) {
 
 function trim(base) {
     return base.replace(/\/+$/, '');
+}
+
+// Coerce value to a finite number. Accepts numbers and numeric strings.
+// Returns null for null, undefined, NaN, Infinity, empty string, or anything
+// non-numeric. Used to normalize provider API fields that may arrive as either
+// int or decimal string (OpenRouter flips between the two for pricing vs
+// created vs context_length).
+function toFiniteNumber(value) {
+    if (value == null || value === '') return null;
+    const n = Number(value);
+    return Number.isFinite(n) ? n : null;
 }
 
 module.exports = { fetchModels };

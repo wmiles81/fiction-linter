@@ -68,6 +68,22 @@ function formatPrice(p) {
     return `$${p.toFixed(2)}`;
 }
 
+// Human-readable context window: 128_000 -> "128k", 2_000_000 -> "2M",
+// 1_500_000 -> "1.5M". Returns null when the value is unknown so callers
+// can omit the suffix entirely.
+function formatContext(tokens) {
+    if (tokens == null || !Number.isFinite(tokens) || tokens <= 0) return null;
+    if (tokens >= 1_000_000) {
+        const m = tokens / 1_000_000;
+        // Show one decimal place if not a round number of millions.
+        return Number.isInteger(m) ? `${m}M` : `${m.toFixed(1)}M`;
+    }
+    if (tokens >= 1000) {
+        return `${Math.round(tokens / 1000)}k`;
+    }
+    return String(tokens);
+}
+
 // A model is considered free when BOTH input and output are $0. OpenRouter
 // labels many previewing/test foundation models at $0/$0 — these are often
 // the best available models for the task, so the UI should surface them
@@ -171,6 +187,7 @@ function ModelPicker({
                 {sortedModels.map(m => {
                     const isSelected = m.id === selectedModel;
                     const free = isFreeModel(m);
+                    const ctx = formatContext(m.contextLength);
                     const classes = [
                         'model-row',
                         isSelected ? 'selected' : '',
@@ -186,7 +203,10 @@ function ModelPicker({
                             data-model-id={m.id}
                             onClick={() => onSelectModel(m.id)}
                         >
-                            <span className="model-row-id">{m.id}</span>
+                            <span className="model-row-id">
+                                {m.id}
+                                {ctx ? <span className="model-row-ctx"> ({ctx})</span> : null}
+                            </span>
                             {free ? (
                                 <span className="model-row-badge free-badge">FREE</span>
                             ) : (

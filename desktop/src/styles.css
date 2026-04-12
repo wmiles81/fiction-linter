@@ -743,6 +743,16 @@ body {
     font-variant-numeric: tabular-nums;
 }
 
+.model-row-ctx {
+    color: var(--g-text-muted, #6b655b);
+    font-variant-numeric: tabular-nums;
+    font-weight: 400;
+}
+
+.model-row.selected .model-row-ctx {
+    color: var(--g-accent, #4a7a4a);
+}
+
 .free-badge {
     background: var(--g-accent, #4a7a4a);
     color: #fff;

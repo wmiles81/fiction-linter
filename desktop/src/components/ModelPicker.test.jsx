@@ -306,6 +306,34 @@ describe('ModelPicker', () => {
         expect(ids).toEqual(['b/premium', 'c/mid', 'a/cheap']);
     });
 
+    it('displays the context window next to the model ID in k / M format', () => {
+        const mixed = [
+            { id: 'small', name: 'Small', pricing: { input: 0, output: 0 }, supportedParameters: new Set(), isThinking: false, contextLength: 32_000 },
+            { id: 'medium', name: 'Medium', pricing: { input: 0, output: 0 }, supportedParameters: new Set(), isThinking: false, contextLength: 128_000 },
+            { id: 'large', name: 'Large', pricing: { input: 0, output: 0 }, supportedParameters: new Set(), isThinking: false, contextLength: 2_000_000 },
+            { id: 'fractional', name: 'Fractional', pricing: { input: 0, output: 0 }, supportedParameters: new Set(), isThinking: false, contextLength: 1_500_000 },
+            { id: 'unknown', name: 'Unknown', pricing: { input: 0, output: 0 }, supportedParameters: new Set(), isThinking: false, contextLength: null }
+        ];
+        const { container } = render(
+            <ModelPicker
+                provider="openrouter" baseUrl="" apiKey=""
+                models={mixed}
+                selectedModel=""
+                hyperparameters={{}}
+                onSelectModel={() => {}}
+                onChangeHyperparameters={() => {}}
+                loading={false} error={null}
+            />
+        );
+        const getRowText = id => container.querySelector(`[data-model-id="${id}"]`)?.textContent || '';
+        expect(getRowText('small')).toMatch(/\(32k\)/);
+        expect(getRowText('medium')).toMatch(/\(128k\)/);
+        expect(getRowText('large')).toMatch(/\(2M\)/);
+        expect(getRowText('fractional')).toMatch(/\(1\.5M\)/);
+        // Unknown contextLength → no parenthesized suffix at all
+        expect(getRowText('unknown')).not.toMatch(/\(\d/);
+    });
+
     it('sort by Context: Largest First orders by contextLength desc', async () => {
         const user = userEvent.setup();
         const mixed = [
