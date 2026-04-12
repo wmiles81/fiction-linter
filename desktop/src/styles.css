@@ -217,6 +217,7 @@ body {
     flex-shrink: 0;
     background: transparent;
     cursor: col-resize;
+    touch-action: none;
     transition: background 100ms ease;
     margin-left: -2px;
     margin-right: -2px;

@@ -10,7 +10,7 @@ describe('PanelResizer', () => {
         expect(gutter).toBeInTheDocument();
     });
 
-    it('fires onResize with the new width on mouse drag', () => {
+    it('fires onResize with the new width on pointer drag', () => {
         const onResize = vi.fn();
         render(
             <PanelResizer
@@ -22,12 +22,12 @@ describe('PanelResizer', () => {
         );
         const gutter = screen.getByRole('separator');
 
-        // Simulate a drag: mousedown on the gutter, mousemove on window, mouseup
-        fireEvent.mouseDown(gutter, { clientX: 260 });
-        fireEvent.mouseMove(window, { clientX: 340 });
-        fireEvent.mouseUp(window);
+        // Simulate a drag: pointerdown, pointermove, pointerup — all on the
+        // gutter element (pointer capture routes events to the capture target).
+        fireEvent.pointerDown(gutter, { clientX: 260, pointerId: 1 });
+        fireEvent.pointerMove(gutter, { clientX: 340, pointerId: 1 });
+        fireEvent.pointerUp(gutter, { clientX: 340, pointerId: 1 });
 
-        // onResize is called with the final width (260 + 80 = 340)
         expect(onResize).toHaveBeenCalled();
         const finalCallArg = onResize.mock.calls[onResize.mock.calls.length - 1][0];
         expect(finalCallArg).toBe(340);
@@ -37,9 +37,9 @@ describe('PanelResizer', () => {
         const onResize = vi.fn();
         render(<PanelResizer onResize={onResize} minWidth={160} maxWidth={800} currentWidth={260} />);
         const gutter = screen.getByRole('separator');
-        fireEvent.mouseDown(gutter, { clientX: 260 });
-        fireEvent.mouseMove(window, { clientX: 50 }); // would be 50, clamp to 160
-        fireEvent.mouseUp(window);
+        fireEvent.pointerDown(gutter, { clientX: 260, pointerId: 1 });
+        fireEvent.pointerMove(gutter, { clientX: 50, pointerId: 1 });
+        fireEvent.pointerUp(gutter, { clientX: 50, pointerId: 1 });
         const finalCallArg = onResize.mock.calls[onResize.mock.calls.length - 1][0];
         expect(finalCallArg).toBe(160);
     });
@@ -48,9 +48,9 @@ describe('PanelResizer', () => {
         const onResize = vi.fn();
         render(<PanelResizer onResize={onResize} minWidth={160} maxWidth={800} currentWidth={260} />);
         const gutter = screen.getByRole('separator');
-        fireEvent.mouseDown(gutter, { clientX: 260 });
-        fireEvent.mouseMove(window, { clientX: 1500 }); // would be 1500, clamp to 800
-        fireEvent.mouseUp(window);
+        fireEvent.pointerDown(gutter, { clientX: 260, pointerId: 1 });
+        fireEvent.pointerMove(gutter, { clientX: 1500, pointerId: 1 });
+        fireEvent.pointerUp(gutter, { clientX: 1500, pointerId: 1 });
         const finalCallArg = onResize.mock.calls[onResize.mock.calls.length - 1][0];
         expect(finalCallArg).toBe(800);
     });

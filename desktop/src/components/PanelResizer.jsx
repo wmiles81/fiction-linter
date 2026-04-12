@@ -1,12 +1,20 @@
-import React, { useCallback, useEffect, useRef } from 'react';
+import React, { useCallback, useRef } from 'react';
 
 function PanelResizer({ onResize, minWidth, maxWidth, currentWidth }) {
     const startX = useRef(null);
     const startWidth = useRef(null);
-    const dragging = useRef(false);
 
-    const handleMouseMove = useCallback((e) => {
-        if (!dragging.current) return;
+    const handlePointerDown = useCallback((e) => {
+        e.preventDefault();
+        e.target.setPointerCapture?.(e.pointerId);
+        startX.current = e.clientX;
+        startWidth.current = currentWidth;
+        document.body.style.cursor = 'col-resize';
+        document.body.style.userSelect = 'none';
+    }, [currentWidth]);
+
+    const handlePointerMove = useCallback((e) => {
+        if (startX.current === null) return;
         const delta = e.clientX - startX.current;
         const newWidth = Math.max(
             minWidth,
@@ -15,31 +23,13 @@ function PanelResizer({ onResize, minWidth, maxWidth, currentWidth }) {
         onResize(newWidth);
     }, [minWidth, maxWidth, onResize]);
 
-    const handleMouseUp = useCallback(() => {
-        dragging.current = false;
-        window.removeEventListener('mousemove', handleMouseMove);
-        window.removeEventListener('mouseup', handleMouseUp);
+    const handlePointerUp = useCallback((e) => {
+        if (startX.current === null) return;
+        startX.current = null;
+        e.target.releasePointerCapture?.(e.pointerId);
         document.body.style.cursor = '';
         document.body.style.userSelect = '';
-    }, [handleMouseMove]);
-
-    const handleMouseDown = useCallback((e) => {
-        e.preventDefault();
-        dragging.current = true;
-        startX.current = e.clientX;
-        startWidth.current = currentWidth;
-        document.body.style.cursor = 'col-resize';
-        document.body.style.userSelect = 'none';
-        window.addEventListener('mousemove', handleMouseMove);
-        window.addEventListener('mouseup', handleMouseUp);
-    }, [currentWidth, handleMouseMove, handleMouseUp]);
-
-    useEffect(() => {
-        return () => {
-            window.removeEventListener('mousemove', handleMouseMove);
-            window.removeEventListener('mouseup', handleMouseUp);
-        };
-    }, [handleMouseMove, handleMouseUp]);
+    }, []);
 
     return (
         <div
@@ -47,7 +37,9 @@ function PanelResizer({ onResize, minWidth, maxWidth, currentWidth }) {
             role="separator"
             aria-orientation="vertical"
             aria-label="Resize files panel"
-            onMouseDown={handleMouseDown}
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
         />
     );
 }
