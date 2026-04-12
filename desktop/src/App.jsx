@@ -91,6 +91,34 @@ function App() {
         hydrate();
     }, [hydrate]);
 
+    // Restore the last-opened folder on startup. The Electron file-chooser
+    // dialog already remembers the last location, but that only helps when
+    // the user reopens it — the file tree panel itself should rehydrate
+    // without requiring a click. Uses localStorage (not Electron userData)
+    // to match the fl.leftPanelWidth pattern for other UI state.
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        let cancelled = false;
+        (async () => {
+            let stored;
+            try {
+                stored = window.localStorage.getItem('fl.rootPath');
+            } catch { /* private mode — skip restore */ }
+            if (!stored || cancelled) return;
+            const entries = await window.api.listDirectory(stored);
+            if (cancelled) return;
+            // listDirectory returns [] for both "empty directory" and
+            // "missing directory" — treat either as success; the user can
+            // click Open to pick a new folder if the previous one is gone.
+            setRootPath(stored);
+            setTree(buildNodes(entries));
+        })();
+        return () => { cancelled = true; };
+        // Intentionally empty deps — runs once on mount. setRootPath/setTree
+        // from zustand are stable.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
     // Phase 7.5 review follow-up: flush the persist debounce on window close so
     // dirty untitled tabs do not lose their last 0-400ms of content if the user
     // quits during the debounce window.
@@ -188,12 +216,26 @@ function App() {
         return () => clearTimeout(handle);
     }, [lintEnabled, content, speData, patternCore, nameCore, settings, setIssues]);
 
+    // Shared between "user clicked Open" and "app restarted with persisted
+    // rootPath." Lists the directory, updates store, and persists to
+    // localStorage so the next launch auto-restores.
+    const loadFolder = async (folderPath) => {
+        if (!folderPath) return;
+        const entries = await window.api.listDirectory(folderPath);
+        // listDirectory returns [] both when the dir is empty and when it
+        // doesn't exist. Peek at existence via a parent-dir listing would be
+        // overkill — an empty list just shows "empty tree" which is correct.
+        setRootPath(folderPath);
+        setTree(buildNodes(entries));
+        try {
+            window.localStorage.setItem('fl.rootPath', folderPath);
+        } catch { /* private mode, quota — non-fatal */ }
+    };
+
     const handleChooseFolder = async () => {
         const selected = await window.api.chooseFolder();
         if (!selected) return;
-        const entries = await window.api.listDirectory(selected);
-        setRootPath(selected);
-        setTree(buildNodes(entries));
+        await loadFolder(selected);
     };
 
     const handleToggleNode = async nodePath => {
