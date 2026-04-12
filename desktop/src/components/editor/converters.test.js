@@ -60,6 +60,31 @@ describe('htmlToMarkdown', () => {
         expect(md).toMatch(/\*\*Bold text\*\*/);
         expect(md).toMatch(/\*italic\*/);
     });
+
+    it('converts tables to pipe-joined paragraphs without throwing', async () => {
+        // Regression: gdoc import used to fail with "Cannot handle unknown
+        // node: table" and drop the whole document. Now tables flatten to
+        // pipe-joined paragraphs so content is preserved.
+        const html = '<p>Intro</p><table><tbody>' +
+            '<tr><td>A1</td><td>B1</td></tr>' +
+            '<tr><td>A2</td><td>B2</td></tr>' +
+            '</tbody></table><p>Outro</p>';
+        const md = await htmlToMarkdown(html);
+        expect(md).toMatch(/Intro/);
+        expect(md).toMatch(/A1 \| B1/);
+        expect(md).toMatch(/A2 \| B2/);
+        expect(md).toMatch(/Outro/);
+    });
+
+    it('handles tables wrapped in thead/tbody', async () => {
+        const html = '<table>' +
+            '<thead><tr><th>Name</th><th>Count</th></tr></thead>' +
+            '<tbody><tr><td>Foo</td><td>1</td></tr></tbody>' +
+            '</table>';
+        const md = await htmlToMarkdown(html);
+        expect(md).toMatch(/Name \| Count/);
+        expect(md).toMatch(/Foo \| 1/);
+    });
 });
 
 describe('sanitizeHtml', () => {
