@@ -469,21 +469,29 @@ ipcMain.handle('gdoc:auth', async () => {
             // Non-fatal; default Electron UA still works for Google.
         }
 
-        // Watch for navigation to docs.google.com — that's our signal that
-        // sign-in completed (Google's `continue=` parameter brings us there).
-        // Each handler defensively checks isDestroyed because navigation
-        // events can fire concurrently with window teardown.
-        const handleNav = (_event, url) => {
+        // Watch for the post-sign-in redirect to docs.google.com and CANCEL
+        // the navigation before Chromium loads the destination. Rendering
+        // docs.google.com triggers a fontations null-deref on macOS 26.3.1 —
+        // by preventDefault()ing the redirect we keep the session cookies
+        // (already set at this point) but never load the page that crashes.
+        //
+        // will-redirect fires when the server responds with a 3xx; calling
+        // event.preventDefault() aborts the redirect entirely. The subsequent
+        // finish({ok:true}) closes the window cleanly.
+        //
+        // will-navigate is the belt-and-suspenders fallback: if sign-in
+        // completes via a direct navigation (no 3xx), this catches it too.
+        const handleBeforeNav = (event, url) => {
             if (resolved || !authWindow || authWindow.isDestroyed()) return;
             if (url && url.startsWith('https://docs.google.com')) {
+                try { event.preventDefault(); } catch { /* already too late */ }
                 finish({ ok: true });
             }
         };
 
         try {
-            authWindow.webContents.on('did-navigate', handleNav);
-            authWindow.webContents.on('did-redirect-navigation', handleNav);
-            authWindow.webContents.on('did-navigate-in-page', handleNav);
+            authWindow.webContents.on('will-redirect', handleBeforeNav);
+            authWindow.webContents.on('will-navigate', handleBeforeNav);
         } catch (err) {
             finish({ ok: false, error: `Failed to attach navigation listeners: ${err.message}` });
             return;
