@@ -9,6 +9,13 @@ const { buildExplainMessages, buildRewriteMessages } = require('./prompts');
 const { getDefaultSpePath: resolveDefaultSpePath } = require('./spePath');
 const { installMenu } = require('./menu');
 
+// macOS 26.3.1 ships CoreText changes that crash Chromium's fontations (Rust)
+// font backend with a null-pointer dereference (SIGSEGV at 0x17) whenever a
+// BrowserWindow renders text. This forces Chromium to fall back to the previous
+// CoreText/FreeType font rendering path, which handles the new APIs correctly.
+// Must be called before app.whenReady().
+app.commandLine.appendSwitch('disable-features', 'FontationsFontBackend');
+
 // Persistent session partition for Google Docs authentication. Cookies stored
 // here survive app restarts. Used by both the gdoc:fetch path (via net.request)
 // AND the gdoc:auth interactive sign-in window (via webPreferences.partition).
