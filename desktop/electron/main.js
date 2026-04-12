@@ -9,30 +9,18 @@ const { buildExplainMessages, buildRewriteMessages } = require('./prompts');
 const { getDefaultSpePath: resolveDefaultSpePath } = require('./spePath');
 const { installMenu } = require('./menu');
 
-// macOS 26.3.1 ships CoreText changes that crash Chromium's fontations (Rust)
-// font backend with a null-pointer dereference (SIGSEGV at 0x17) whenever a
-// BrowserWindow renders text. This forces Chromium to fall back to the previous
-// CoreText/FreeType font rendering path, which handles the new APIs correctly.
-// Must be called before app.whenReady().
-app.commandLine.appendSwitch('disable-features', 'FontationsFontBackend');
 
-// Persistent session partition for Google Docs authentication. Cookies stored
-// here survive app restarts. Used by both the gdoc:fetch path (via net.request)
-// AND the gdoc:auth interactive sign-in window (via webPreferences.partition).
-// Approach borrowed from Focus-viewer-spec/09-google-docs.md — instead of
-// registering a Google Cloud OAuth client, we BE the logged-in browser.
+// Google Docs authentication uses Electron's default session (the same one
+// the main window uses). Earlier attempts with a custom partition
+// (persist:google-auth) crashed on macOS 26.3.1 with a deterministic SIGSEGV
+// in fontations (Chromium's Rust font renderer) during partition init.
+// The default session renders fine in the main window — sharing it for the
+// auth BrowserWindow avoids the crash entirely.
 //
-// HISTORY: an earlier attempt on Electron 31.7.7 + macOS 26.3.1 crashed the
-// main process with a deterministic SIGSEGV inside the fontations glyph
-// renderer when this BrowserWindow opened. Electron 32+ ships fontations
-// updates for newer macOS releases, so this code now lives behind an
-// Electron 34 baseline (see desktop/package.json).
-const GOOGLE_AUTH_PARTITION = 'persist:google-auth';
+// Cookies from Google sign-in persist in the default session across app
+// restarts (Electron persists the default session by default). The
+// gdoc:signout handler clears Google cookies specifically.
 const GOOGLE_USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
-
-function getGoogleSession() {
-    return session.fromPartition(GOOGLE_AUTH_PARTITION);
-}
 
 // Detect a Google login page in a response body. Google sometimes returns
 // HTTP 200 with a login page when an unauthenticated request hits the export
@@ -49,17 +37,14 @@ function isGoogleLoginPage(body) {
 //   { ok: false, kind: 'auth-required', reason }  on 401/403/login page
 //   { ok: false, error }                          on network/other failures
 //
-// Uses `partition: GOOGLE_AUTH_PARTITION` (a string) instead of
-// `session: <Session>` (an object). Both are valid Electron APIs but the
-// string variant has fewer lifecycle gotchas — passing a Session object
-// can null-pointer-crash the main process when the object's lifetime gets
-// tangled with the request lifecycle.
+// Uses the default session (no partition specified). This means cookies set
+// during the gdoc:auth sign-in flow (which also uses the default session)
+// will automatically attach to this request.
 function fetchWithGoogleSession(url) {
     return new Promise((resolve) => {
         const request = net.request({
             method: 'GET',
             url,
-            partition: GOOGLE_AUTH_PARTITION,
             useSessionCookies: true,
             redirect: 'follow'
         });
@@ -442,11 +427,11 @@ ipcMain.handle('gdoc:auth', async () => {
                 title: 'Sign in to Google',
                 show: true,
                 webPreferences: {
-                    // Use the partition STRING, not a Session object. The string
-                    // form is the documented and well-tested API; passing a
-                    // Session object has caused null-pointer crashes in the
-                    // main process under sandbox + custom-session combinations.
-                    partition: GOOGLE_AUTH_PARTITION,
+                    // Uses the default session (no partition). Earlier attempts
+                    // with partition: 'persist:google-auth' crashed on macOS
+                    // 26.3.1 during partition font-cache initialization.
+                    // The default session is already proven stable (the main
+                    // window uses it). Cookies persist across restarts.
                     contextIsolation: true,
                     nodeIntegration: false,
                     sandbox: true
@@ -501,12 +486,18 @@ ipcMain.handle('gdoc:auth', async () => {
     });
 });
 
-// Sign out of Google: clear all storage data for the persist:google-auth
-// partition (cookies, cache, local storage, etc.). After this the next
-// fs:readGdoc on a private doc will return auth-required again.
+// Sign out of Google: remove Google cookies from the default session.
+// Uses origin filter to only clear google.com cookies — preserves any
+// other cookies the app may have set (none currently, but defensive).
 ipcMain.handle('gdoc:signout', async () => {
     try {
-        await getGoogleSession().clearStorageData();
+        const defaultSession = session.defaultSession;
+        await defaultSession.clearStorageData({
+            origin: 'https://accounts.google.com'
+        });
+        await defaultSession.clearStorageData({
+            origin: 'https://docs.google.com'
+        });
         return { ok: true };
     } catch (error) {
         return { ok: false, error: error.message };
