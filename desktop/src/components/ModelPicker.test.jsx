@@ -24,6 +24,9 @@ const sampleModels = [
 describe('ModelPicker', () => {
     beforeEach(() => {
         window.api.fetchModels = vi.fn();
+        // Reset persisted sort mode so each test starts in the default
+        // "provider" sort, independent of any prior test selecting e.g. 'free'.
+        try { window.localStorage.removeItem('fl.modelSort'); } catch { /* ignore */ }
     });
 
     it('renders model rows with right-aligned pricing when provided', () => {
@@ -255,34 +258,17 @@ describe('ModelPicker', () => {
         expect(screen.getByText('$0.40 / $1.60')).toBeInTheDocument();
     });
 
-    it('bubbles free models to the top of the unfiltered list', () => {
-        const mixedModels = [
-            {
-                id: 'openai/gpt-4.1-mini',
-                name: 'GPT 4.1 Mini',
-                pricing: { input: 0.4, output: 1.6 },
-                supportedParameters: new Set(),
-                isThinking: false
-            },
-            {
-                id: 'aaa/free-preview',
-                name: 'Free preview',
-                pricing: { input: 0, output: 0 },
-                supportedParameters: new Set(),
-                isThinking: false
-            },
-            {
-                id: 'zzz/another-free',
-                name: 'Another free',
-                pricing: { input: 0, output: 0 },
-                supportedParameters: new Set(),
-                isThinking: false
-            }
+    it('sort dropdown switches to Cost: Low to High and places free models first', async () => {
+        const user = userEvent.setup();
+        const mixed = [
+            { id: 'x/premium', name: 'Premium', pricing: { input: 15, output: 60 }, supportedParameters: new Set(), isThinking: false },
+            { id: 'y/cheap', name: 'Cheap', pricing: { input: 0.1, output: 0.3 }, supportedParameters: new Set(), isThinking: false },
+            { id: 'z/free', name: 'Free', pricing: { input: 0, output: 0 }, supportedParameters: new Set(), isThinking: false }
         ];
         const { container } = render(
             <ModelPicker
                 provider="openrouter" baseUrl="" apiKey=""
-                models={mixedModels}
+                models={mixed}
                 selectedModel=""
                 hyperparameters={{}}
                 onSelectModel={() => {}}
@@ -290,16 +276,85 @@ describe('ModelPicker', () => {
                 loading={false} error={null}
             />
         );
-        const renderedIds = Array.from(container.querySelectorAll('[data-model-id]'))
+        await user.selectOptions(screen.getByRole('combobox', { name: /sort/i }), 'cost-asc');
+        const ids = Array.from(container.querySelectorAll('[data-model-id]'))
             .map(el => el.getAttribute('data-model-id'));
-        expect(renderedIds).toEqual([
-            'aaa/free-preview',
-            'zzz/another-free',
-            'openai/gpt-4.1-mini'
-        ]);
+        expect(ids).toEqual(['z/free', 'y/cheap', 'x/premium']);
     });
 
-    it('free-only toggle filters to $0 models and shows count in label', async () => {
+    it('sort by Cost: High to Low puts most-expensive first', async () => {
+        const user = userEvent.setup();
+        const mixed = [
+            { id: 'a/cheap', name: 'Cheap', pricing: { input: 0.1, output: 0.3 }, supportedParameters: new Set(), isThinking: false },
+            { id: 'b/premium', name: 'Premium', pricing: { input: 15, output: 60 }, supportedParameters: new Set(), isThinking: false },
+            { id: 'c/mid', name: 'Mid', pricing: { input: 2, output: 8 }, supportedParameters: new Set(), isThinking: false }
+        ];
+        const { container } = render(
+            <ModelPicker
+                provider="openrouter" baseUrl="" apiKey=""
+                models={mixed}
+                selectedModel=""
+                hyperparameters={{}}
+                onSelectModel={() => {}}
+                onChangeHyperparameters={() => {}}
+                loading={false} error={null}
+            />
+        );
+        await user.selectOptions(screen.getByRole('combobox', { name: /sort/i }), 'cost-desc');
+        const ids = Array.from(container.querySelectorAll('[data-model-id]'))
+            .map(el => el.getAttribute('data-model-id'));
+        expect(ids).toEqual(['b/premium', 'c/mid', 'a/cheap']);
+    });
+
+    it('sort by Context: Largest First orders by contextLength desc', async () => {
+        const user = userEvent.setup();
+        const mixed = [
+            { id: 'a', name: 'A', pricing: { input: 0, output: 0 }, supportedParameters: new Set(), isThinking: false, contextLength: 128_000 },
+            { id: 'b', name: 'B', pricing: { input: 0, output: 0 }, supportedParameters: new Set(), isThinking: false, contextLength: 2_000_000 },
+            { id: 'c', name: 'C', pricing: { input: 0, output: 0 }, supportedParameters: new Set(), isThinking: false, contextLength: 32_000 }
+        ];
+        const { container } = render(
+            <ModelPicker
+                provider="openrouter" baseUrl="" apiKey=""
+                models={mixed}
+                selectedModel=""
+                hyperparameters={{}}
+                onSelectModel={() => {}}
+                onChangeHyperparameters={() => {}}
+                loading={false} error={null}
+            />
+        );
+        await user.selectOptions(screen.getByRole('combobox', { name: /sort/i }), 'context-desc');
+        const ids = Array.from(container.querySelectorAll('[data-model-id]'))
+            .map(el => el.getAttribute('data-model-id'));
+        expect(ids).toEqual(['b', 'a', 'c']);
+    });
+
+    it('sort by Newest First orders by created desc', async () => {
+        const user = userEvent.setup();
+        const mixed = [
+            { id: 'old', name: 'Old', pricing: { input: 1, output: 1 }, supportedParameters: new Set(), isThinking: false, created: 1_600_000_000 },
+            { id: 'new', name: 'New', pricing: { input: 1, output: 1 }, supportedParameters: new Set(), isThinking: false, created: 1_800_000_000 },
+            { id: 'mid', name: 'Mid', pricing: { input: 1, output: 1 }, supportedParameters: new Set(), isThinking: false, created: 1_700_000_000 }
+        ];
+        const { container } = render(
+            <ModelPicker
+                provider="openrouter" baseUrl="" apiKey=""
+                models={mixed}
+                selectedModel=""
+                hyperparameters={{}}
+                onSelectModel={() => {}}
+                onChangeHyperparameters={() => {}}
+                loading={false} error={null}
+            />
+        );
+        await user.selectOptions(screen.getByRole('combobox', { name: /sort/i }), 'newest');
+        const ids = Array.from(container.querySelectorAll('[data-model-id]'))
+            .map(el => el.getAttribute('data-model-id'));
+        expect(ids).toEqual(['new', 'mid', 'old']);
+    });
+
+    it('Free only option filters to $0 models and shows count in its label', async () => {
         const user = userEvent.setup();
         const mixedModels = [
             { id: 'free/a', name: 'A', pricing: { input: 0, output: 0 }, supportedParameters: new Set(), isThinking: false },
@@ -317,19 +372,17 @@ describe('ModelPicker', () => {
                 loading={false} error={null}
             />
         );
-        // Label shows count of free models
-        expect(screen.getByText(/Free only \(2\)/i)).toBeInTheDocument();
-        // Before filtering: all three rows
+        // Free option shows the count in parentheses
+        expect(screen.getByRole('option', { name: /Free only \(2\)/i })).toBeInTheDocument();
+        // Before filtering: three rows (default Provider sort)
         expect(container.querySelectorAll('[data-model-id]')).toHaveLength(3);
-        // Toggle on
-        await user.click(screen.getByRole('checkbox'));
-        // After filtering: only the free two
+        await user.selectOptions(screen.getByRole('combobox', { name: /sort/i }), 'free');
         const filteredIds = Array.from(container.querySelectorAll('[data-model-id]'))
             .map(el => el.getAttribute('data-model-id'));
         expect(filteredIds).toEqual(['free/a', 'free/b']);
     });
 
-    it('hides free-only filter when no free models exist', () => {
+    it('hides the Free only option when no free models exist', () => {
         const onlyPaid = [
             { id: 'paid/x', name: 'X', pricing: { input: 1, output: 2 }, supportedParameters: new Set(), isThinking: false }
         ];
@@ -344,7 +397,7 @@ describe('ModelPicker', () => {
                 loading={false} error={null}
             />
         );
-        expect(screen.queryByText(/Free only/i)).not.toBeInTheDocument();
+        expect(screen.queryByRole('option', { name: /Free only/i })).not.toBeInTheDocument();
     });
 
     it('sorts unprefixed model IDs alphabetically', () => {

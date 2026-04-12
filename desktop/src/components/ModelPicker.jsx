@@ -12,6 +12,57 @@ const PARAM_CONFIGS = {
     thinking: { label: 'Thinking Budget Tokens', type: 'number', step: 100, min: 0, max: 32000 }
 };
 
+// Sort / view modes the user can pick. Each entry has a label (shown in the
+// dropdown) and a compare function (ascending). 'free' is a special mode
+// that filters AND sorts by id within the free set.
+const SORT_MODES = {
+    provider: {
+        label: 'Provider (A–Z)',
+        compare: (a, b) => a.id.localeCompare(b.id)
+    },
+    'cost-asc': {
+        label: 'Cost: Low to High',
+        // Sort by input+output since the effective cost is both combined.
+        // Free models naturally sort first. Null pricing sorts last so
+        // unknown-cost models do not masquerade as "cheap".
+        compare: (a, b) => effectiveCost(a) - effectiveCost(b) || a.id.localeCompare(b.id)
+    },
+    'cost-desc': {
+        label: 'Cost: High to Low',
+        compare: (a, b) => effectiveCost(b) - effectiveCost(a) || a.id.localeCompare(b.id)
+    },
+    'context-desc': {
+        label: 'Context: Largest First',
+        // For novelists with long manuscripts: sort by context window
+        // desc. Unknown context sorts last.
+        compare: (a, b) => (b.contextLength ?? -1) - (a.contextLength ?? -1) || a.id.localeCompare(b.id)
+    },
+    newest: {
+        label: 'Newest First',
+        // Uses the `created` unix timestamp from the provider API.
+        // Providers that do not supply a date sort last.
+        compare: (a, b) => (b.created ?? -1) - (a.created ?? -1) || a.id.localeCompare(b.id)
+    },
+    free: {
+        label: 'Free only',
+        // Filter mode: handled specially (see sortedModels logic).
+        compare: (a, b) => a.id.localeCompare(b.id)
+    }
+};
+
+const DEFAULT_SORT = 'provider';
+const SORT_STORAGE_KEY = 'fl.modelSort';
+
+// Effective cost for sorting: sum of input + output per-1M. Treat unknown
+// pricing as Infinity so these models sort to the bottom of asc views and
+// the top of desc views (either way, highlighting their ambiguity).
+function effectiveCost(m) {
+    const input = m?.pricing?.input;
+    const output = m?.pricing?.output;
+    if (input == null || output == null) return Infinity;
+    return input + output;
+}
+
 function formatPrice(p) {
     if (p == null) return '—';
     return `$${p.toFixed(2)}`;
@@ -25,6 +76,16 @@ function isFreeModel(m) {
     return m?.pricing?.input === 0 && m?.pricing?.output === 0;
 }
 
+function readStoredSort() {
+    if (typeof window === 'undefined') return DEFAULT_SORT;
+    try {
+        const stored = window.localStorage.getItem(SORT_STORAGE_KEY);
+        return stored && SORT_MODES[stored] ? stored : DEFAULT_SORT;
+    } catch {
+        return DEFAULT_SORT;
+    }
+}
+
 function ModelPicker({
     models,
     selectedModel,
@@ -34,27 +95,23 @@ function ModelPicker({
     loading,
     error
 }) {
-    const [freeOnly, setFreeOnly] = useState(false);
+    const [sortMode, setSortMode] = useState(readStoredSort);
 
-    // Sort models by full ID. For OpenRouter-style "provider/model" IDs this
-    // groups models by provider AND sorts within each provider in one pass
-    // (because the slash-prefix sorts alphabetically). For direct OpenAI /
-    // Anthropic / Ollama fetches the IDs are unprefixed model names so the
-    // sort gives a flat alphabetical list — also what users expect.
-    //
-    // When freeOnly is on, filter to $0/$0 models. When OFF, free models
-    // still bubble to the top via a secondary sort so a user scanning the
-    // list spots them without having to scroll past paid ones first.
+    const handleSortChange = (nextMode) => {
+        setSortMode(nextMode);
+        try {
+            window.localStorage.setItem(SORT_STORAGE_KEY, nextMode);
+        } catch { /* private mode, quota — non-fatal */ }
+    };
+
+    // Apply the active mode's filter + sort. Only 'free' filters; all other
+    // modes show every model. 'provider' is the alphabetical default.
     const sortedModels = useMemo(() => {
         const base = [...(models || [])];
-        const filtered = freeOnly ? base.filter(isFreeModel) : base;
-        return filtered.sort((a, b) => {
-            const aFree = isFreeModel(a);
-            const bFree = isFreeModel(b);
-            if (aFree !== bFree) return aFree ? -1 : 1;
-            return a.id.localeCompare(b.id);
-        });
-    }, [models, freeOnly]);
+        const filtered = sortMode === 'free' ? base.filter(isFreeModel) : base;
+        const compare = SORT_MODES[sortMode]?.compare || SORT_MODES[DEFAULT_SORT].compare;
+        return filtered.sort(compare);
+    }, [models, sortMode]);
 
     const freeCount = useMemo(
         () => (models || []).filter(isFreeModel).length,
@@ -76,16 +133,29 @@ function ModelPicker({
         <div className="model-picker">
             <div className="model-picker-header">
                 <span>Model</span>
-                {freeCount > 0 ? (
-                    <label className="model-picker-filter" title="Show only models with $0 prompt and $0 completion pricing">
-                        <input
-                            type="checkbox"
-                            checked={freeOnly}
-                            onChange={e => setFreeOnly(e.target.checked)}
-                        />
-                        <span>Free only ({freeCount})</span>
-                    </label>
-                ) : null}
+                <label className="model-picker-sort">
+                    <span className="visually-hidden">Sort models by</span>
+                    <select
+                        className="model-picker-sort-select"
+                        value={sortMode}
+                        onChange={e => handleSortChange(e.target.value)}
+                        aria-label="Sort models by"
+                    >
+                        {Object.entries(SORT_MODES).map(([value, def]) => {
+                            // Decorate the Free option with its count so users
+                            // know whether switching to it is worthwhile.
+                            const label = value === 'free' && freeCount > 0
+                                ? `${def.label} (${freeCount})`
+                                : def.label;
+                            // Hide the Free option entirely when there are zero
+                            // free models — picking it would empty the list.
+                            if (value === 'free' && freeCount === 0) return null;
+                            return (
+                                <option key={value} value={value}>{label}</option>
+                            );
+                        })}
+                    </select>
+                </label>
                 {loading ? <span className="model-picker-loading">Loading…</span> : null}
                 {error ? <span className="model-picker-error">{error}</span> : null}
             </div>
@@ -93,7 +163,7 @@ function ModelPicker({
             <div className="model-listbox" role="listbox" aria-label="Model list">
                 {sortedModels.length === 0 && !loading && !error ? (
                     <div className="model-listbox-empty">
-                        {freeOnly
+                        {sortMode === 'free'
                             ? 'No free models available from this provider.'
                             : 'Enter an API key and refresh to load models.'}
                     </div>

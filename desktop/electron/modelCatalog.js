@@ -2,9 +2,12 @@
  * Per-provider model catalog fetchers.
  *
  * Returns a normalized model list regardless of provider API shape:
- *   [{ id, name, pricing: { input, output }, supportedParameters, isThinking }]
+ *   [{ id, name, pricing: { input, output }, supportedParameters,
+ *      isThinking, contextLength, created }]
  *
- * Pricing is in USD per 1M tokens.
+ * - pricing: USD per 1M tokens
+ * - contextLength: number of tokens, or null if unknown
+ * - created: unix timestamp (seconds) of when the model was published, or null
  */
 
 async function fetchModels({ provider, baseUrl, apiKey }) {
@@ -43,7 +46,9 @@ async function fetchOpenRouterModels({ baseUrl, apiKey }) {
                 output: Number(m.pricing?.completion ?? 0) * 1_000_000
             },
             supportedParameters: new Set(m.supported_parameters || []),
-            isThinking: Array.isArray(m.supported_parameters) && m.supported_parameters.includes('reasoning')
+            isThinking: Array.isArray(m.supported_parameters) && m.supported_parameters.includes('reasoning'),
+            contextLength: m.context_length ?? m.top_provider?.context_length ?? null,
+            created: typeof m.created === 'number' ? m.created : null
         }));
         return { ok: true, models };
     } catch (err) {
@@ -70,7 +75,9 @@ async function fetchOpenAIModels({ baseUrl, apiKey }) {
                 name: m.id,
                 pricing,
                 supportedParameters: inferOpenAIParameters(m.id),
-                isThinking: isReasoning
+                isThinking: isReasoning,
+                contextLength: OPENAI_CONTEXT[m.id] || null,
+                created: typeof m.created === 'number' ? m.created : null
             };
         });
         return { ok: true, models };
@@ -78,6 +85,18 @@ async function fetchOpenAIModels({ baseUrl, apiKey }) {
         return { ok: false, error: `Network error: ${err.message}` };
     }
 }
+
+// OpenAI /models does NOT return context length. Hardcoded for well-known models.
+const OPENAI_CONTEXT = {
+    'gpt-4.1': 1_047_576,
+    'gpt-4.1-mini': 1_047_576,
+    'gpt-4o': 128_000,
+    'gpt-4o-mini': 128_000,
+    'o1': 200_000,
+    'o1-mini': 128_000,
+    'o3': 200_000,
+    'o3-mini': 200_000
+};
 
 // OpenAI per-1M token pricing (USD). Update periodically.
 const OPENAI_PRICING = {
@@ -118,12 +137,21 @@ async function fetchAnthropicModels({ baseUrl, apiKey }) {
         const models = (payload.data || []).map(m => {
             const pricing = ANTHROPIC_PRICING[m.id] || { input: null, output: null };
             const isThinking = m.id.includes('claude-opus') || m.id.includes('claude-sonnet');
+            // Anthropic /models gives created_at as an ISO string; convert
+            // to unix seconds so it sorts consistently with other providers.
+            let created = null;
+            if (m.created_at) {
+                const parsed = Date.parse(m.created_at);
+                if (!Number.isNaN(parsed)) created = Math.floor(parsed / 1000);
+            }
             return {
                 id: m.id,
                 name: m.display_name || m.id,
                 pricing,
                 supportedParameters: new Set(['temperature', 'top_p', 'top_k', 'max_tokens', 'thinking']),
-                isThinking
+                isThinking,
+                contextLength: ANTHROPIC_CONTEXT[m.id] || 200_000,
+                created
             };
         });
         return { ok: true, models };
@@ -131,6 +159,12 @@ async function fetchAnthropicModels({ baseUrl, apiKey }) {
         return { ok: false, error: `Network error: ${err.message}` };
     }
 }
+
+const ANTHROPIC_CONTEXT = {
+    'claude-opus-4-5-20251001': 200_000,
+    'claude-sonnet-4-5-20250514': 200_000,
+    'claude-haiku-4-5-20251001': 200_000
+};
 
 const ANTHROPIC_PRICING = {
     'claude-opus-4-5-20251001': { input: 15, output: 75 },
@@ -150,7 +184,9 @@ async function fetchOllamaModels({ baseUrl }) {
             name: m.name,
             pricing: { input: 0, output: 0 }, // local
             supportedParameters: new Set(['temperature', 'top_p', 'top_k', 'max_tokens', 'seed']),
-            isThinking: false // local models do not typically expose reasoning as a separate param
+            isThinking: false, // local models do not typically expose reasoning as a separate param
+            contextLength: m.details?.parameter_size ? null : null, // Ollama API doesn't expose context length reliably
+            created: typeof m.modified_at === 'string' ? Math.floor(Date.parse(m.modified_at) / 1000) : null
         }));
         return { ok: true, models };
     } catch (err) {
