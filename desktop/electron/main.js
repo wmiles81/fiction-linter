@@ -137,6 +137,7 @@ function readSettings() {
         const data = JSON.parse(raw);
         return {
             spePath: data.spePath || getDefaultSpePath(),
+            lastRootPath: data.lastRootPath || '',
             ai: {
                 provider: data.ai?.provider || 'openrouter',
                 model: data.ai?.model || 'openai/gpt-4.1-mini',
@@ -148,6 +149,7 @@ function readSettings() {
     } catch (error) {
         return {
             spePath: getDefaultSpePath(),
+            lastRootPath: '',
             ai: {
                 provider: 'openrouter',
                 model: 'openai/gpt-4.1-mini',
@@ -161,8 +163,15 @@ function readSettings() {
 
 function writeSettings(settings) {
     const settingsPath = path.join(app.getPath('userData'), SETTINGS_FILE);
+    // Preserve lastRootPath across writes: the Settings dialog only knows
+    // about spePath/ai, but we do not want those saves to clobber the
+    // recently-opened folder. Read the current value first.
+    const current = readSettings();
     const payload = {
         spePath: settings.spePath || getDefaultSpePath(),
+        lastRootPath: settings.lastRootPath !== undefined
+            ? settings.lastRootPath
+            : current.lastRootPath,
         ai: {
             provider: settings.ai?.provider || 'openrouter',
             model: settings.ai?.model || 'openai/gpt-4.1-mini',
@@ -173,6 +182,18 @@ function writeSettings(settings) {
     };
     fs.writeFileSync(settingsPath, JSON.stringify(payload, null, 2), 'utf8');
     return payload;
+}
+
+// Persist just the lastRootPath without touching other settings. Called
+// when the user opens a folder — localStorage handles this too, but the
+// settings.json copy is a belt-and-suspenders fallback that survives
+// storage-partition resets and cross-session quirks.
+function writeLastRootPath(rootPath) {
+    const settingsPath = path.join(app.getPath('userData'), SETTINGS_FILE);
+    const current = readSettings();
+    current.lastRootPath = rootPath || '';
+    fs.writeFileSync(settingsPath, JSON.stringify(current, null, 2), 'utf8');
+    return current;
 }
 
 function createWindow() {
@@ -529,6 +550,10 @@ ipcMain.handle('settings:get', async () => {
 
 ipcMain.handle('settings:set', async (_event, settings) => {
     return writeSettings(settings || {});
+});
+
+ipcMain.handle('settings:setLastRootPath', async (_event, rootPath) => {
+    return writeLastRootPath(rootPath || '');
 });
 
 ipcMain.handle('models:fetch', async (_event, providerConfig) => {

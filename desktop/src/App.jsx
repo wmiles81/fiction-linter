@@ -91,19 +91,25 @@ function App() {
         hydrate();
     }, [hydrate]);
 
-    // Restore the last-opened folder on startup. The Electron file-chooser
-    // dialog already remembers the last location, but that only helps when
-    // the user reopens it — the file tree panel itself should rehydrate
-    // without requiring a click. Uses localStorage (not Electron userData)
-    // to match the fl.leftPanelWidth pattern for other UI state.
+    // Restore the last-opened folder on startup. Reads from TWO sources in
+    // order: localStorage (fast, same-origin) and the main-process
+    // settings.json (durable, survives storage resets). Either is enough;
+    // both exist for belt-and-suspenders reliability.
     useEffect(() => {
         if (typeof window === 'undefined') return;
         let cancelled = false;
         (async () => {
-            let stored;
+            let stored = null;
             try {
                 stored = window.localStorage.getItem('fl.rootPath');
-            } catch { /* private mode — skip restore */ }
+            } catch { /* private mode — fall through to settings.json */ }
+            if (!stored) {
+                // localStorage empty or unavailable — ask the main process.
+                try {
+                    const s = await window.api.getSettings();
+                    stored = s?.lastRootPath || null;
+                } catch { /* IPC failed — give up, just show empty tree */ }
+            }
             if (!stored || cancelled) return;
             const entries = await window.api.listDirectory(stored);
             if (cancelled) return;
@@ -217,8 +223,10 @@ function App() {
     }, [lintEnabled, content, speData, patternCore, nameCore, settings, setIssues]);
 
     // Shared between "user clicked Open" and "app restarted with persisted
-    // rootPath." Lists the directory, updates store, and persists to
-    // localStorage so the next launch auto-restores.
+    // rootPath." Lists the directory, updates store, and persists to BOTH
+    // localStorage AND the main-process settings.json so the next launch
+    // auto-restores. Belt-and-suspenders: localStorage can be wiped by
+    // devtools or storage-partition changes; settings.json is durable.
     const loadFolder = async (folderPath) => {
         if (!folderPath) return;
         const entries = await window.api.listDirectory(folderPath);
@@ -230,6 +238,7 @@ function App() {
         try {
             window.localStorage.setItem('fl.rootPath', folderPath);
         } catch { /* private mode, quota — non-fatal */ }
+        window.api.setLastRootPath?.(folderPath);
     };
 
     const handleChooseFolder = async () => {

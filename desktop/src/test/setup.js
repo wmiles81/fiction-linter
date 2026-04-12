@@ -24,6 +24,7 @@ if (typeof window !== 'undefined' && !window.api) {
             ai: { provider: 'openrouter', model: '', apiKey: '', baseUrl: '' }
         }),
         saveSettings: async settings => settings,
+        setLastRootPath: async () => ({}),
         loadSpeData: async () => ({ cliches: {}, names: {}, places: {}, protocols: {} }),
         aiComplete: async () => ({ ok: false, error: 'stub' }),
         fetchModels: async () => ({ ok: true, models: [] }),
