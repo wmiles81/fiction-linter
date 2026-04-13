@@ -7,6 +7,7 @@ import SettingsDialog from './components/SettingsDialog';
 import PanelResizer from './components/PanelResizer';
 import TabBar from './components/TabBar';
 import StatusBar from './components/StatusBar';
+import ThemePicker from './components/ThemePicker';
 import { getFileKind } from './lib/fileEligibility';
 import { useAppStore } from './store/useAppStore';
 import { useEditorStore } from './store/useEditorStore';
@@ -90,6 +91,14 @@ function App() {
     useEffect(() => {
         hydrate();
     }, [hydrate]);
+
+    // Paint the persisted theme onto <html data-theme> as soon as React
+    // mounts. The store constructor already reads localStorage synchronously
+    // during module init; this just pushes that value to the DOM attribute
+    // so CSS theme selectors activate.
+    useEffect(() => {
+        useAppStore.getState().hydrateTheme();
+    }, []);
 
     // Restore the last-opened folder on startup. Reads from TWO sources in
     // order: localStorage (fast, same-origin) and the main-process
@@ -456,6 +465,7 @@ function App() {
                     <span className="brand-tag">Desktop Studio</span>
                 </div>
                 <div className="top-actions">
+                    <ThemePicker />
                     <button
                         className="icon-button"
                         onClick={() => setShowSettings(true)}

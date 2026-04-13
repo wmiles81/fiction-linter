@@ -1,7 +1,23 @@
-:root {
+/*
+ * Theme system — each theme is selected by setting data-theme="xxx" on the
+ * <html> element. The default (no attribute) uses Parchment.
+ *
+ * Every component references colors through CSS custom properties, so adding
+ * a theme is just a block of variable overrides — no component changes.
+ *
+ * Four themes chosen to match actual writing contexts:
+ *   parchment       — warm afternoon desk, writerly default
+ *   midnight        — dark navy/amber, for late-night sessions
+ *   sepia           — aged-book tan/burgundy, for long drafts
+ *   high-contrast   — WCAG-level black/white/blue, for accessibility
+ */
+:root,
+:root[data-theme="parchment"] {
     color-scheme: light;
+    /* Shell palette */
     --bg-1: #f6f1eb;
     --bg-2: #dde7f2;
+    --bg-3: #fbe9dd;
     --surface: #ffffffcc;
     --surface-strong: #ffffff;
     --ink: #1c1b19;
@@ -10,6 +26,96 @@
     --accent-2: #2f6f86;
     --border: #d3d5da;
     --shadow: 0 18px 40px rgba(28, 27, 25, 0.12);
+    /* Workspace/editor palette */
+    --g-bg: #ffffff;
+    --g-text: #2a2620;
+    --g-text-muted: #6b655b;
+    --g-accent: #4a7a4a;
+    --g-accent-bg: #e8f0e8;
+    --g-border: #d7d2c5;
+    --g-panel-bg: #faf8f4;
+    --g-surface: #faf7f0;
+    --g-surface-hover: rgba(0, 0, 0, 0.04);
+    --g-danger: #b33a3a;
+    --g-warning: #b8860b;
+}
+
+:root[data-theme="midnight"] {
+    color-scheme: dark;
+    --bg-1: #0f1419;
+    --bg-2: #1a2332;
+    --bg-3: #0a0d12;
+    --surface: #1e2935cc;
+    --surface-strong: #1e2935;
+    --ink: #e8e6e3;
+    --muted: #8a8680;
+    --accent: #e8a252;
+    --accent-2: #7db4c4;
+    --border: #2d3947;
+    --shadow: 0 18px 40px rgba(0, 0, 0, 0.6);
+    --g-bg: #141a21;
+    --g-text: #e8e6e3;
+    --g-text-muted: #8a8680;
+    --g-accent: #7dc47d;
+    --g-accent-bg: #1e3a1e;
+    --g-border: #2d3947;
+    --g-panel-bg: #1a2028;
+    --g-surface: #1a2028;
+    --g-surface-hover: rgba(255, 255, 255, 0.04);
+    --g-danger: #e87575;
+    --g-warning: #f0c060;
+}
+
+:root[data-theme="sepia"] {
+    color-scheme: light;
+    --bg-1: #f2e9d8;
+    --bg-2: #e8dcc4;
+    --bg-3: #fdecd6;
+    --surface: #faf3e4cc;
+    --surface-strong: #faf3e4;
+    --ink: #3d2914;
+    --muted: #7a5a3a;
+    --accent: #8b2e2e;
+    --accent-2: #5a4a2e;
+    --border: #c9b896;
+    --shadow: 0 18px 40px rgba(61, 41, 20, 0.15);
+    --g-bg: #faf3e4;
+    --g-text: #3d2914;
+    --g-text-muted: #7a5a3a;
+    --g-accent: #8b2e2e;
+    --g-accent-bg: #f0d8c0;
+    --g-border: #c9b896;
+    --g-panel-bg: #f5ecd8;
+    --g-surface: #f2e9d8;
+    --g-surface-hover: rgba(61, 41, 20, 0.05);
+    --g-danger: #a83232;
+    --g-warning: #a67c1f;
+}
+
+:root[data-theme="high-contrast"] {
+    color-scheme: light;
+    --bg-1: #ffffff;
+    --bg-2: #f0f0f0;
+    --bg-3: #ffffff;
+    --surface: #ffffff;
+    --surface-strong: #ffffff;
+    --ink: #000000;
+    --muted: #333333;
+    --accent: #0052cc;
+    --accent-2: #6a1b9a;
+    --border: #000000;
+    --shadow: 0 0 0 1px #000000;
+    --g-bg: #ffffff;
+    --g-text: #000000;
+    --g-text-muted: #444444;
+    --g-accent: #0052cc;
+    --g-accent-bg: #d4e4ff;
+    --g-border: #000000;
+    --g-panel-bg: #f8f8f8;
+    --g-surface: #ffffff;
+    --g-surface-hover: rgba(0, 0, 0, 0.08);
+    --g-danger: #c00000;
+    --g-warning: #8b5a00;
 }
 
 * {
@@ -32,7 +138,7 @@ body {
     margin: 0;
     overflow: hidden;
     font-family: 'Space Grotesk', system-ui, sans-serif;
-    background: radial-gradient(circle at top left, var(--bg-2), var(--bg-1) 55%, #fbe9dd 100%);
+    background: radial-gradient(circle at top left, var(--bg-2), var(--bg-1) 55%, var(--bg-3) 100%);
     color: var(--ink);
     line-height: 1.35;
 }
@@ -73,6 +179,124 @@ body {
     display: flex;
     gap: 10px;
     align-items: center;
+}
+
+.theme-picker {
+    position: relative;
+}
+
+.theme-picker-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px 6px 8px;
+    background: var(--surface-strong, #ffffff);
+    border: 1px solid var(--border, #d3d5da);
+    border-radius: 6px;
+    color: var(--ink, #1c1b19);
+    font-size: 12px;
+    font-weight: 500;
+    font-family: inherit;
+    cursor: pointer;
+    transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.theme-picker-toggle:hover {
+    border-color: var(--accent, #d05b41);
+}
+
+.theme-picker-toggle:focus-visible {
+    outline: none;
+    border-color: var(--accent, #d05b41);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent, #d05b41) 30%, transparent);
+}
+
+.theme-picker-label {
+    letter-spacing: 0.02em;
+}
+
+.theme-picker-chevron {
+    width: 12px;
+    height: 12px;
+    opacity: 0.6;
+}
+
+.theme-swatch {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border-radius: 4px;
+    border: 1px solid rgba(0, 0, 0, 0.12);
+    flex-shrink: 0;
+}
+
+.theme-picker-menu {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    min-width: 240px;
+    margin: 0;
+    padding: 4px;
+    list-style: none;
+    background: var(--surface-strong, #ffffff);
+    border: 1px solid var(--border, #d3d5da);
+    border-radius: 8px;
+    box-shadow: var(--shadow, 0 18px 40px rgba(0, 0, 0, 0.12));
+    z-index: 50;
+}
+
+.theme-picker-option {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    background: transparent;
+    border: 0;
+    border-radius: 5px;
+    color: var(--ink, #1c1b19);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.theme-picker-option:hover {
+    background: var(--g-surface-hover, rgba(0, 0, 0, 0.04));
+}
+
+.theme-picker-option.selected {
+    background: var(--g-accent-bg, #e8f0e8);
+    color: var(--g-accent, #4a7a4a);
+}
+
+.theme-picker-option-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex: 1;
+    min-width: 0;
+}
+
+.theme-picker-option-label {
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.theme-picker-option-desc {
+    font-size: 11px;
+    color: var(--muted, #5b5e67);
+    line-height: 1.3;
+}
+
+.theme-picker-option.selected .theme-picker-option-desc {
+    color: inherit;
+    opacity: 0.8;
+}
+
+.theme-picker-check {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
 }
 
 .ghost-button,
