@@ -490,7 +490,18 @@ function App() {
                 }
             });
             if (result.ok) {
-                setStatus(`AI scan complete — ${result.issues.length} findings.`);
+                // Build an honest completion status: count, plus any failure
+                // detail. Without the failure detail, "0 findings" reads as
+                // "your prose is great" when really every chunk's AI call
+                // could have died with a 429. Surfacing failedChunks tells
+                // the user whether to trust the result or re-run.
+                const parts = [`AI scan complete — ${result.issues.length} findings`];
+                if (result.failedChunks > 0) {
+                    parts.push(
+                        `(${result.failedChunks} chunk${result.failedChunks === 1 ? '' : 's'} failed: ${result.lastError || 'unknown error'})`
+                    );
+                }
+                setStatus(parts.join(' '));
             } else if (result.error === 'Scan cancelled') {
                 // Already status-set by the cancel branch; no-op.
             } else {

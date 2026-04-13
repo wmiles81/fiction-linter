@@ -21,17 +21,18 @@ const SYSTEM_REWRITE =
 // Asks for strict JSON so the renderer can parse findings reliably; the
 // "text" field has to match EXACTLY so indexOf can locate it in the source.
 const SYSTEM_SCAN =
-    'You are a line editor for literary fiction. Scan the paragraph below for issues ' +
-    'that deterministic pattern linters cannot catch: show-don\'t-tell violations, ' +
-    'weak phrasing, generic or AI-sounding language, over-explanation, and emotional telling. ' +
-    '\n\n' +
+    'You are a line editor for literary fiction. Scan the text below (which may contain ' +
+    'one or more paragraphs) for issues that deterministic pattern linters cannot catch: ' +
+    'show-don\'t-tell violations, weak phrasing, generic or AI-sounding language, ' +
+    'over-explanation, and emotional telling.\n\n' +
     'Return STRICT JSON with this exact shape:\n' +
-    '{"findings": [{"text": "<exact substring from the paragraph>", ' +
+    '{"findings": [{"text": "<exact substring from the text>", ' +
     '"category": "show-vs-tell|weak-phrasing|generic|over-explanation|emotional-telling", ' +
     '"message": "<one-sentence explanation>"}]}\n\n' +
     'Rules:\n' +
-    '- The "text" field MUST be an exact substring of the paragraph (same characters, same case).\n' +
-    '- Include 0 to 5 findings per paragraph. If the prose is strong, return {"findings": []}.\n' +
+    '- The "text" field MUST be an exact substring of the text (same characters, same case).\n' +
+    '- Keep "text" short — a phrase or short clause, not a whole paragraph.\n' +
+    '- Include 0 to 15 findings per request. If the prose is strong, return {"findings": []}.\n' +
     '- Do not flag stylistic choices that are working. Flag only clear weaknesses.\n' +
     '- Return ONLY the JSON object, no preamble, no markdown fences, no commentary.';
 

@@ -3,6 +3,7 @@ import {
     splitParagraphs,
     parseScanResponse,
     toDocumentIssues,
+    chunkParagraphs,
     scanDocument
 } from './aiScanner';
 
@@ -102,59 +103,125 @@ describe('toDocumentIssues', () => {
     });
 });
 
+describe('chunkParagraphs', () => {
+    const buildParas = (text) => splitParagraphs(text);
+
+    it('returns empty for empty paragraph list', () => {
+        expect(chunkParagraphs([], '', 100)).toEqual([]);
+    });
+
+    it('groups multiple short paragraphs into a single chunk under target', () => {
+        const text = 'one two three.\n\nfour five.\n\nsix seven eight.';
+        const paras = buildParas(text);
+        const chunks = chunkParagraphs(paras, text, 100);
+        expect(chunks).toHaveLength(1);
+        expect(chunks[0].paragraphCount).toBe(3);
+        expect(chunks[0].start).toBe(0);
+        expect(chunks[0].end).toBe(text.length);
+    });
+
+    it('starts a new chunk when adding next paragraph would exceed target', () => {
+        // Paragraphs of ~5 words each. Target 10 → 2 paras per chunk.
+        const text = [
+            'a b c d e.',
+            'f g h i j.',
+            'k l m n o.',
+            'p q r s t.'
+        ].join('\n\n');
+        const chunks = chunkParagraphs(buildParas(text), text, 10);
+        // Para 1 (5w) fits → group has 5w. Adding para 2 (5w) → 10w which is
+        // NOT greater than 10, so it's added → chunk 1 has 2 paras, 10 words.
+        // Adding para 3 (5w) → 15w, exceeds → flush chunk 1, start chunk 2.
+        expect(chunks).toHaveLength(2);
+        expect(chunks[0].paragraphCount).toBe(2);
+        expect(chunks[1].paragraphCount).toBe(2);
+    });
+
+    it('keeps a single overlong paragraph as one chunk rather than splitting it', () => {
+        const longPara = Array(50).fill('word').join(' ');
+        const text = `short.\n\n${longPara}\n\nshort.`;
+        const chunks = chunkParagraphs(buildParas(text), text, 10);
+        // Splitting mid-paragraph would break offset translation, so the long
+        // one occupies its own chunk despite being over the target.
+        expect(chunks).toHaveLength(3);
+        expect(chunks[1].paragraphCount).toBe(1);
+    });
+
+    it('chunk text is the EXACT document slice including inter-paragraph whitespace', () => {
+        const text = 'first.\n\nsecond.';
+        const chunks = chunkParagraphs(buildParas(text), text, 100);
+        expect(chunks[0].text).toBe('first.\n\nsecond.');
+    });
+});
+
 describe('scanDocument', () => {
-    it('invokes callAi once per paragraph and accumulates issues', async () => {
+    it('groups all paragraphs into a single chunk under default 2K target', async () => {
         const text = 'First sentence.\n\nSecond sentence.';
-        const callAi = vi.fn(async (para) => {
-            if (para === 'First sentence.') {
-                return {
-                    ok: true,
-                    content: '{"findings":[{"text":"First","category":"ai","message":"bad opener"}]}'
-                };
-            }
-            return { ok: true, content: '{"findings":[]}' };
-        });
+        const callAi = vi.fn(async (chunk) => ({
+            ok: true,
+            content: '{"findings":[{"text":"First","category":"ai","message":"bad opener"}]}'
+        }));
         const result = await scanDocument({ text, callAi });
-        expect(callAi).toHaveBeenCalledTimes(2);
+        // Both paragraphs combined = ~4 words → fits in one 2K chunk.
+        expect(callAi).toHaveBeenCalledTimes(1);
         expect(result.ok).toBe(true);
         expect(result.issues).toHaveLength(1);
         expect(result.issues[0].start).toBe(0);
         expect(result.issues[0].end).toBe(5);
     });
 
-    it('reports progress after each paragraph', async () => {
-        const text = 'P1.\n\nP2.\n\nP3.';
-        const callAi = async () => ({ ok: true, content: '{"findings":[]}' });
-        const onProgress = vi.fn();
-        await scanDocument({ text, callAi, onProgress });
-        expect(onProgress).toHaveBeenCalledTimes(3);
-        expect(onProgress.mock.calls[0][0]).toEqual({ current: 1, total: 3, issues: [] });
-        expect(onProgress.mock.calls[2][0]).toEqual({ current: 3, total: 3, issues: [] });
+    it('makes one call per chunk when targetWords forces splits', async () => {
+        const text = 'a b c d e.\n\nf g h i j.\n\nk l m n o.\n\np q r s t.';
+        const callAi = vi.fn(async () => ({ ok: true, content: '{"findings":[]}' }));
+        await scanDocument({ text, callAi, targetWords: 10 });
+        expect(callAi).toHaveBeenCalledTimes(2);
     });
 
-    it('stops at the next paragraph boundary when aborted', async () => {
-        const text = 'P1.\n\nP2.\n\nP3.';
+    it('reports progress after each chunk', async () => {
+        const text = 'a b c d e.\n\nf g h i j.\n\nk l m n o.\n\np q r s t.';
+        const callAi = async () => ({ ok: true, content: '{"findings":[]}' });
+        const onProgress = vi.fn();
+        await scanDocument({ text, callAi, onProgress, targetWords: 10 });
+        expect(onProgress).toHaveBeenCalledTimes(2);
+        expect(onProgress.mock.calls[0][0]).toMatchObject({ current: 1, total: 2 });
+        expect(onProgress.mock.calls[1][0]).toMatchObject({ current: 2, total: 2 });
+    });
+
+    it('stops at the next chunk boundary when aborted', async () => {
+        const text = 'a b c d e.\n\nf g h i j.\n\nk l m n o.\n\np q r s t.';
         const controller = new AbortController();
         const callAi = vi.fn(async () => {
-            // Abort after the first paragraph completes.
             controller.abort();
             return { ok: true, content: '{"findings":[]}' };
         });
-        const result = await scanDocument({ text, callAi, signal: controller.signal });
+        const result = await scanDocument({
+            text, callAi, signal: controller.signal, targetWords: 10
+        });
         expect(result.ok).toBe(false);
         expect(result.error).toBe('Scan cancelled');
-        // First paragraph was processed, second+third skipped.
         expect(callAi).toHaveBeenCalledTimes(1);
     });
 
-    it('continues through individual AI failures without aborting the whole scan', async () => {
-        const text = 'P1.\n\nP2.';
-        const callAi = vi.fn()
-            .mockResolvedValueOnce({ ok: false, error: 'rate limit' })
-            .mockResolvedValueOnce({ ok: true, content: '{"findings":[{"text":"P2","category":"ai","message":"x"}]}' });
+    it('counts failed chunks and returns the last error so the UI can surface it', async () => {
+        const text = 'one two three.\n\nfour five six.';
+        const callAi = vi.fn(async () => ({ ok: false, error: '429 rate limited' }));
+        const result = await scanDocument({ text, callAi, targetWords: 5 });
+        expect(result.ok).toBe(true);
+        expect(result.issues).toHaveLength(0);
+        expect(result.failedChunks).toBe(2);
+        expect(result.lastError).toBe('429 rate limited');
+    });
+
+    it('treats non-JSON responses as failures, not silent zero-findings', async () => {
+        // Simulate a model that ignored the JSON instruction and returned prose.
+        const text = 'hello world.';
+        const callAi = vi.fn(async () => ({
+            ok: true,
+            content: 'I think the prose is generally fine, no major issues.'
+        }));
         const result = await scanDocument({ text, callAi });
         expect(result.ok).toBe(true);
-        expect(result.issues).toHaveLength(1);
-        expect(result.issues[0].message).toBe('x');
+        expect(result.failedChunks).toBe(1);
+        expect(result.lastError).toMatch(/findings JSON/);
     });
 });

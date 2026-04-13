@@ -1,17 +1,19 @@
 /**
  * AI document scanner.
  *
- * Splits plain text into paragraphs, sends each to the AI via window.api.aiScan,
- * parses structured findings from the response, and translates paragraph-local
+ * Splits plain text into paragraphs, groups them into ~2K-word chunks
+ * (paragraph-aligned), sends each chunk to the AI via window.api.aiScan,
+ * parses structured findings from the response, and translates chunk-local
  * offsets to document-global offsets.
  *
- * Why scan paragraph-by-paragraph instead of the whole document?
- *   1. Progress is observable — users can cancel mid-scan.
- *   2. Each AI request stays small, avoiding context-limit failures on long
- *      manuscripts.
- *   3. Partial results can be rendered incrementally (every returned paragraph
- *      adds findings to the overlay immediately).
- *   4. A single bad response only corrupts one paragraph, not the whole run.
+ * Why chunk by word count instead of one-paragraph-at-a-time?
+ *   1. Free OpenRouter endpoints rate-limit aggressively (~10–20 RPM). A
+ *      50-paragraph chapter at 1 request per paragraph trips the limit;
+ *      grouping into 2K-word chunks cuts request count by ~10x.
+ *   2. Modern context windows (128K+) easily hold 2K-word chunks.
+ *   3. The model sees more surrounding flow per call, which helps it judge
+ *      what's actually weak vs. just unusual.
+ *   4. Cancellation is still granular — checked between chunks.
  */
 
 /**
@@ -92,19 +94,22 @@ export function parseScanResponse(raw) {
 }
 
 /**
- * Translate paragraph-scoped AI findings to document-scoped issues matching
+ * Translate chunk-scoped AI findings to document-scoped issues matching
  * the pattern-finding shape expected by the lint overlay.
  *
  *   { start, end, message, severity, category, source: 'ai' }
+ *
+ * `chunk` shape: { text, start, end } — same as a paragraph, but covering
+ * possibly multiple paragraphs joined by their original separators.
  */
-export function toDocumentIssues(paragraph, findings) {
+export function toDocumentIssues(chunk, findings) {
     const issues = [];
     for (const f of findings) {
-        const localIdx = paragraph.text.indexOf(f.text);
-        if (localIdx < 0) continue; // AI hallucinated text not in the paragraph
+        const localIdx = chunk.text.indexOf(f.text);
+        if (localIdx < 0) continue; // AI hallucinated text not in the chunk
         issues.push({
-            start: paragraph.start + localIdx,
-            end: paragraph.start + localIdx + f.text.length,
+            start: chunk.start + localIdx,
+            end: chunk.start + localIdx + f.text.length,
             message: f.message || `AI flagged: ${f.category}`,
             severity: 'info',
             category: f.category,
@@ -115,40 +120,126 @@ export function toDocumentIssues(paragraph, findings) {
 }
 
 /**
+ * Approximate word count — splits on whitespace runs. Cheap; only used
+ * to decide chunk boundaries, so exactness doesn't matter.
+ */
+function wordCount(text) {
+    if (!text) return 0;
+    const trimmed = text.trim();
+    if (!trimmed) return 0;
+    return trimmed.split(/\s+/).length;
+}
+
+/**
+ * Group paragraphs into chunks of roughly `targetWords` words each, never
+ * splitting a paragraph. Chunks include the original document text from
+ * the first paragraph's start to the last paragraph's end (preserving
+ * inter-paragraph whitespace), so AI findings can use indexOf against the
+ * exact substring that the AI saw.
+ *
+ * @param {Array<{text,start,end}>} paragraphs - From splitParagraphs().
+ * @param {string} sourceText - The original document plain text. Needed to
+ *     reconstruct chunks with their inter-paragraph whitespace intact.
+ * @param {number} targetWords - Soft target per chunk (default 2000). A
+ *     chunk may exceed this by one paragraph since we never split mid-para.
+ * @returns {Array<{text, start, end, paragraphCount}>}
+ */
+export function chunkParagraphs(paragraphs, sourceText, targetWords = 2000) {
+    if (!paragraphs || paragraphs.length === 0) return [];
+    const chunks = [];
+    let groupStart = paragraphs[0].start;
+    let groupEnd = paragraphs[0].end;
+    let groupWords = wordCount(paragraphs[0].text);
+    let groupCount = 1;
+
+    const flush = () => {
+        chunks.push({
+            text: sourceText.slice(groupStart, groupEnd),
+            start: groupStart,
+            end: groupEnd,
+            paragraphCount: groupCount
+        });
+    };
+
+    for (let i = 1; i < paragraphs.length; i++) {
+        const para = paragraphs[i];
+        const paraWords = wordCount(para.text);
+        // Start a new chunk if adding this paragraph would push us over the
+        // target. Keep at least one paragraph per chunk even if it alone
+        // exceeds the target — splitting mid-paragraph is worse than going over.
+        if (groupWords + paraWords > targetWords && groupCount > 0) {
+            flush();
+            groupStart = para.start;
+            groupEnd = para.end;
+            groupWords = paraWords;
+            groupCount = 1;
+        } else {
+            groupEnd = para.end;
+            groupWords += paraWords;
+            groupCount += 1;
+        }
+    }
+    flush();
+    return chunks;
+}
+
+/**
  * Run an AI scan over plain text.
  *
  * @param {object} opts
  * @param {string} opts.text - Plain text to scan (usually from getPlainText()).
- * @param {function} opts.callAi - Async fn that takes a paragraph string and
+ * @param {function} opts.callAi - Async fn that takes a chunk string and
  *     returns { ok, content, error }. Injected so tests can stub it.
- * @param {AbortSignal} [opts.signal] - Abort signal; when aborted the scan
- *     stops at the next paragraph boundary.
+ * @param {AbortSignal} [opts.signal] - Abort signal; checked between chunks.
  * @param {function} [opts.onProgress] - Called with { current, total, issues }
- *     after each paragraph completes. `issues` is the accumulated issue list.
- * @returns {Promise<{ ok: boolean, issues: array, error?: string }>}
+ *     after each chunk. `issues` is the accumulated issue list.
+ * @param {number} [opts.targetWords] - Soft chunk size in words. Default 2000.
+ * @returns {Promise<{ ok, issues, failedChunks, lastError, error? }>}
+ *     `failedChunks` is the count of chunks where the AI call failed OR the
+ *     response failed to parse. `lastError` is the most recent error string,
+ *     useful for surfacing diagnostic info when the scan completed but
+ *     produced no findings.
  */
-export async function scanDocument({ text, callAi, signal, onProgress }) {
+export async function scanDocument({ text, callAi, signal, onProgress, targetWords = 2000 }) {
     const paragraphs = splitParagraphs(text);
+    const chunks = chunkParagraphs(paragraphs, text, targetWords);
     const allIssues = [];
-    if (paragraphs.length === 0) {
-        return { ok: true, issues: [] };
+    let failedChunks = 0;
+    let lastError = null;
+
+    if (chunks.length === 0) {
+        return { ok: true, issues: [], failedChunks: 0, lastError: null };
     }
-    for (let i = 0; i < paragraphs.length; i++) {
+
+    for (let i = 0; i < chunks.length; i++) {
         if (signal?.aborted) {
-            return { ok: false, error: 'Scan cancelled', issues: allIssues };
+            return { ok: false, error: 'Scan cancelled', issues: allIssues, failedChunks, lastError };
         }
-        const para = paragraphs[i];
-        const result = await callAi(para.text);
+        const chunk = chunks[i];
+        const result = await callAi(chunk.text);
         if (signal?.aborted) {
-            return { ok: false, error: 'Scan cancelled', issues: allIssues };
+            return { ok: false, error: 'Scan cancelled', issues: allIssues, failedChunks, lastError };
         }
-        if (result?.ok && result.content) {
+        if (!result?.ok) {
+            // Network/auth/rate-limit failure. Track it but keep going so a
+            // mid-document 429 doesn't kill the whole scan.
+            failedChunks += 1;
+            lastError = result?.error || 'unknown error';
+        } else if (!result.content) {
+            failedChunks += 1;
+            lastError = 'empty response';
+        } else {
             const findings = parseScanResponse(result.content);
-            const paragraphIssues = toDocumentIssues(para, findings);
-            allIssues.push(...paragraphIssues);
+            if (findings.length === 0 && result.content.trim().length > 0 && !result.content.includes('"findings"')) {
+                // The model returned text but no parseable findings array —
+                // count it as a failure so the user knows the model misbehaved.
+                failedChunks += 1;
+                lastError = 'response was not valid findings JSON';
+            }
+            const chunkIssues = toDocumentIssues(chunk, findings);
+            allIssues.push(...chunkIssues);
         }
-        // Progress is reported even for failed paragraphs so the UI keeps moving.
-        onProgress?.({ current: i + 1, total: paragraphs.length, issues: allIssues });
+        onProgress?.({ current: i + 1, total: chunks.length, issues: allIssues });
     }
-    return { ok: true, issues: allIssues };
+    return { ok: true, issues: allIssues, failedChunks, lastError };
 }
