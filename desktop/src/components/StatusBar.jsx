@@ -16,7 +16,9 @@ function StatusBar({
     lintEnabled,
     showFindings,
     onToggleLint,
-    onToggleFindings
+    onToggleFindings,
+    scanProgress,
+    onToggleAiScan
 }) {
     const wordCount = useMemo(() => countWords(content), [content]);
     const charCount = content?.length ?? 0;
@@ -26,9 +28,36 @@ function StatusBar({
     // to flash "0 words selected" in the UI.
     const hasSelection = !!selection && selection.chars > 0;
 
+    // AI scan button state. scanProgress is either null (idle) or
+    // { current, total } while a scan is running. Label reflects both.
+    const scanning = !!scanProgress;
+    const scanPercent = scanning && scanProgress.total > 0
+        ? Math.round((scanProgress.current / scanProgress.total) * 100)
+        : 0;
+    const scanLabel = scanning
+        ? `AI Scan: ${scanPercent}%`
+        : 'AI Scan';
+    const scanTitle = scanning
+        ? `Scanning paragraph ${scanProgress.current} of ${scanProgress.total} — click to cancel`
+        : 'Run AI scan on the current document';
+
     return (
         <footer className="status-bar">
             <div className="status-bar-left">
+                {onToggleAiScan ? (
+                    <button
+                        type="button"
+                        className={`status-bar-scan ${scanning ? 'running' : ''}`}
+                        onClick={onToggleAiScan}
+                        title={scanTitle}
+                        aria-label={scanLabel}
+                    >
+                        <span className="status-bar-scan-icon" aria-hidden="true">
+                            {scanning ? '\u21bb' : '\u2728'}
+                        </span>
+                        <span>{scanLabel}</span>
+                    </button>
+                ) : null}
                 <span className="status-bar-text">{status}</span>
                 {dirty ? (
                     <span className="status-bar-dirty" title="Unsaved changes">

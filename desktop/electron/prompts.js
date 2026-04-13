@@ -16,6 +16,25 @@ const SYSTEM_REWRITE =
     'prefixed with "1.", "2.", "3.". Preserve the author\'s meaning and voice. ' +
     'Do not add commentary, preamble, or explanations.';
 
+// The scan prompt asks the model to find issues the deterministic pattern
+// linter cannot — things that need comprehension, not pattern matching.
+// Asks for strict JSON so the renderer can parse findings reliably; the
+// "text" field has to match EXACTLY so indexOf can locate it in the source.
+const SYSTEM_SCAN =
+    'You are a line editor for literary fiction. Scan the paragraph below for issues ' +
+    'that deterministic pattern linters cannot catch: show-don\'t-tell violations, ' +
+    'weak phrasing, generic or AI-sounding language, over-explanation, and emotional telling. ' +
+    '\n\n' +
+    'Return STRICT JSON with this exact shape:\n' +
+    '{"findings": [{"text": "<exact substring from the paragraph>", ' +
+    '"category": "show-vs-tell|weak-phrasing|generic|over-explanation|emotional-telling", ' +
+    '"message": "<one-sentence explanation>"}]}\n\n' +
+    'Rules:\n' +
+    '- The "text" field MUST be an exact substring of the paragraph (same characters, same case).\n' +
+    '- Include 0 to 5 findings per paragraph. If the prose is strong, return {"findings": []}.\n' +
+    '- Do not flag stylistic choices that are working. Flag only clear weaknesses.\n' +
+    '- Return ONLY the JSON object, no preamble, no markdown fences, no commentary.';
+
 function buildExplainMessages({ finding, snippet }) {
     return [
         { role: 'system', content: SYSTEM_EXPLAIN },
@@ -47,9 +66,18 @@ function buildRewriteMessages({ finding, snippet }) {
     ];
 }
 
+function buildScanMessages({ paragraph }) {
+    return [
+        { role: 'system', content: SYSTEM_SCAN },
+        { role: 'user', content: paragraph }
+    ];
+}
+
 module.exports = {
     buildExplainMessages,
     buildRewriteMessages,
+    buildScanMessages,
     SYSTEM_EXPLAIN,
-    SYSTEM_REWRITE
+    SYSTEM_REWRITE,
+    SYSTEM_SCAN
 };

@@ -15,6 +15,7 @@ contextBridge.exposeInMainWorld('api', {
     setLastRootPath: rootPath => ipcRenderer.invoke('settings:setLastRootPath', rootPath),
     loadSpeData: spePath => ipcRenderer.invoke('spe:load', spePath),
     aiComplete: payload => ipcRenderer.invoke('ai:complete', payload),
+    aiScan: paragraph => ipcRenderer.invoke('ai:scan', { paragraph }),
     fetchModels: config => ipcRenderer.invoke('models:fetch', config),
     loadTabs: () => ipcRenderer.invoke('tabs:load'),
     saveTabs: state => ipcRenderer.invoke('tabs:save', state),

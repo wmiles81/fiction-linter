@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef } from 'react';
 import { PatternLinterCore, NameValidatorCore } from '@shared/linting';
+import { scanDocument } from './lib/aiScanner';
 import FileTree from './components/FileTree';
 import Editor from './components/editor/Editor';
 import { htmlToMarkdown } from './components/editor/converters';
@@ -39,7 +40,12 @@ function App() {
     const lintEnabled = useLintStore(state => state.enabled);
     const showFindings = useLintStore(state => state.showFindings);
     const issues = useLintStore(state => state.issues);
+    const aiIssues = useLintStore(state => state.aiIssues);
+    const scanProgress = useLintStore(state => state.scanProgress);
     const setIssues = useLintStore(state => state.setIssues);
+    const setAiIssues = useLintStore(state => state.setAiIssues);
+    const clearAiIssues = useLintStore(state => state.clearAiIssues);
+    const setScanProgress = useLintStore(state => state.setScanProgress);
     const setLintEnabled = useLintStore(state => state.setEnabled);
     const setShowFindings = useLintStore(state => state.setShowFindings);
 
@@ -442,6 +448,60 @@ function App() {
         }
     };
 
+    // Ref to the AbortController of a running scan. Using a ref, not state,
+    // because aborting should not trigger a re-render — the scan's own
+    // progress callbacks already push state updates.
+    const scanAbortRef = useRef(null);
+
+    const handleToggleAiScan = async () => {
+        // Running → cancel.
+        if (scanAbortRef.current) {
+            scanAbortRef.current.abort();
+            scanAbortRef.current = null;
+            setScanProgress(null);
+            setStatus('AI scan cancelled.');
+            return;
+        }
+        // Idle → start.
+        if (!settings?.ai?.apiKey) {
+            setStatus('AI scan needs an API key — open Settings to configure one.');
+            return;
+        }
+        const text = editorRef.current?.getPlainText?.() || content;
+        if (!text || !text.trim()) {
+            setStatus('Nothing to scan.');
+            return;
+        }
+        const controller = new AbortController();
+        scanAbortRef.current = controller;
+        clearAiIssues();
+        setScanProgress({ current: 0, total: 0 });
+        setStatus('AI scan started…');
+        try {
+            const result = await scanDocument({
+                text,
+                signal: controller.signal,
+                callAi: (paragraph) => window.api.aiScan(paragraph),
+                onProgress: ({ current, total, issues: partial }) => {
+                    setScanProgress({ current, total });
+                    // Push partial results to the store so findings appear as the
+                    // scan progresses, not only at the end.
+                    setAiIssues(partial);
+                }
+            });
+            if (result.ok) {
+                setStatus(`AI scan complete — ${result.issues.length} findings.`);
+            } else if (result.error === 'Scan cancelled') {
+                // Already status-set by the cancel branch; no-op.
+            } else {
+                setStatus(`AI scan failed: ${result.error || 'unknown error'}`);
+            }
+        } finally {
+            scanAbortRef.current = null;
+            setScanProgress(null);
+        }
+    };
+
     const handleSettingsSave = async nextSettings => {
         const updated = await window.api.saveSettings(nextSettings);
         setSettings(updated);
@@ -455,7 +515,14 @@ function App() {
     // use editorRef.current.getPlainText() for the source text since findings
     // are in plain-text coordinates, not markdown coordinates.
 
-    const visibleIssues = showFindings ? issues : [];
+    // Merge deterministic pattern findings with AI scan findings. AI findings
+    // survive pattern re-lint (kept in a separate store field) so they remain
+    // visible after incidental keystrokes, until the user starts a new scan.
+    const mergedIssues = useMemo(
+        () => [...issues, ...aiIssues],
+        [issues, aiIssues]
+    );
+    const visibleIssues = showFindings ? mergedIssues : [];
 
     return (
         <div className="app-shell">
@@ -546,6 +613,8 @@ function App() {
                 showFindings={showFindings}
                 onToggleLint={() => setLintEnabled(!lintEnabled)}
                 onToggleFindings={() => setShowFindings(!showFindings)}
+                scanProgress={scanProgress}
+                onToggleAiScan={handleToggleAiScan}
             />
 
             {showSettings && settings ? (

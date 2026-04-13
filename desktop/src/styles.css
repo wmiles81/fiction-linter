@@ -637,6 +637,41 @@ body {
     cursor: not-allowed;
 }
 
+.status-bar-scan {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: transparent;
+    border: 1px solid var(--g-border, #d7d2c5);
+    color: var(--g-accent, #4a7a4a);
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+}
+
+.status-bar-scan:hover {
+    background: var(--g-accent-bg, #e8f0e8);
+    border-color: var(--g-accent, #4a7a4a);
+}
+
+.status-bar-scan.running {
+    background: var(--g-accent-bg, #e8f0e8);
+    border-color: var(--g-accent, #4a7a4a);
+}
+
+.status-bar-scan.running .status-bar-scan-icon {
+    display: inline-block;
+    animation: fl-spin 1s linear infinite;
+}
+
+@keyframes fl-spin {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+}
+
 .status-bar-selection {
     color: var(--g-accent, #4a7a4a);
     font-weight: 600;

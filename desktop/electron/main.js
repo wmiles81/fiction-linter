@@ -5,7 +5,7 @@ const yaml = require('js-yaml');
 const mammoth = require('mammoth');
 const { callChatCompletion } = require('./aiClient');
 const { fetchModels } = require('./modelCatalog');
-const { buildExplainMessages, buildRewriteMessages } = require('./prompts');
+const { buildExplainMessages, buildRewriteMessages, buildScanMessages } = require('./prompts');
 const { getDefaultSpePath: resolveDefaultSpePath } = require('./spePath');
 const { installMenu } = require('./menu');
 
@@ -617,6 +617,27 @@ ipcMain.handle('ai:complete', async (_event, payload) => {
         ? buildExplainMessages({ finding, snippet })
         : buildRewriteMessages({ finding, snippet });
 
+    return callChatCompletion({
+        baseUrl: settings.ai.baseUrl,
+        apiKey: settings.ai.apiKey,
+        model: settings.ai.model,
+        hyperparameters: settings.ai.hyperparameters,
+        messages
+    });
+});
+
+// Per-paragraph AI scan. Renderer splits the document into paragraphs and
+// fires one of these per paragraph (serially or throttled) so progress is
+// observable and cancellation is granular. Returns raw AI text content —
+// parsing the JSON is a renderer responsibility since it needs to handle
+// malformed output gracefully without blowing up the main process.
+ipcMain.handle('ai:scan', async (_event, payload) => {
+    const { paragraph } = payload || {};
+    if (!paragraph || typeof paragraph !== 'string') {
+        return { ok: false, error: 'Missing paragraph text.' };
+    }
+    const settings = readSettings();
+    const messages = buildScanMessages({ paragraph });
     return callChatCompletion({
         baseUrl: settings.ai.baseUrl,
         apiKey: settings.ai.apiKey,
