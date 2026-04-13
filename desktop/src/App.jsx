@@ -467,9 +467,16 @@ function App() {
             setStatus('AI scan needs an API key — open Settings to configure one.');
             return;
         }
-        const text = editorRef.current?.getPlainText?.() || content;
+        const plainFromEditor = editorRef.current?.getPlainText?.();
+        const text = plainFromEditor || content;
+        // eslint-disable-next-line no-console
+        console.log('[ai-scan] starting', {
+            textLength: text?.length || 0,
+            usingEditorPlainText: !!plainFromEditor,
+            firstLine: text?.split('\n')?.[0]?.slice(0, 80)
+        });
         if (!text || !text.trim()) {
-            setStatus('Nothing to scan.');
+            setStatus('Nothing to scan — the document appears to be empty.');
             return;
         }
         const controller = new AbortController();
@@ -481,25 +488,43 @@ function App() {
             const result = await scanDocument({
                 text,
                 signal: controller.signal,
-                callAi: (paragraph) => window.api.aiScan(paragraph),
+                callAi: async (paragraph) => {
+                    const r = await window.api.aiScan(paragraph);
+                    // eslint-disable-next-line no-console
+                    console.log('[ai-scan] chunk result', {
+                        chunkLen: paragraph.length,
+                        ok: r?.ok,
+                        contentLen: r?.content?.length || 0,
+                        error: r?.error,
+                        sample: r?.content?.slice(0, 120)
+                    });
+                    return r;
+                },
                 onProgress: ({ current, total, issues: partial }) => {
                     setScanProgress({ current, total });
-                    // Push partial results to the store so findings appear as the
-                    // scan progresses, not only at the end.
                     setAiIssues(partial);
                 }
             });
+            // eslint-disable-next-line no-console
+            console.log('[ai-scan] complete', result);
+
             if (result.ok) {
-                // Build an honest completion status: count, plus any failure
-                // detail. Without the failure detail, "0 findings" reads as
-                // "your prose is great" when really every chunk's AI call
-                // could have died with a 429. Surfacing failedChunks tells
-                // the user whether to trust the result or re-run.
-                const parts = [`AI scan complete — ${result.issues.length} findings`];
+                // Build an honest completion status. Always include the chunk
+                // count so the user can tell "0 chunks" (text empty / unsplit)
+                // from "N chunks succeeded with 0 findings each" (model just
+                // didn't flag anything) from "N chunks failed" (rate-limited
+                // or auth issue).
+                const parts = [`AI scan: ${result.issues.length} finding${result.issues.length === 1 ? '' : 's'} across ${result.chunkCount} chunk${result.chunkCount === 1 ? '' : 's'}`];
                 if (result.failedChunks > 0) {
                     parts.push(
-                        `(${result.failedChunks} chunk${result.failedChunks === 1 ? '' : 's'} failed: ${result.lastError || 'unknown error'})`
+                        `— ${result.failedChunks} failed (${result.lastError || 'unknown error'})`
                     );
+                } else if (result.chunkCount === 0) {
+                    parts.push('— no scannable text found');
+                } else if (result.issues.length === 0 && result.lastSampleResponse) {
+                    // 0 findings with no failures: the model is responding
+                    // cleanly. Show a sample so the user can sanity-check.
+                    parts.push(`— sample response: "${result.lastSampleResponse.slice(0, 60).replace(/\n/g, ' ')}…"`);
                 }
                 setStatus(parts.join(' '));
             } else if (result.error === 'Scan cancelled') {

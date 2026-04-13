@@ -206,9 +206,17 @@ export async function scanDocument({ text, callAi, signal, onProgress, targetWor
     const allIssues = [];
     let failedChunks = 0;
     let lastError = null;
+    let lastSampleResponse = null; // first content body, for debugging
 
     if (chunks.length === 0) {
-        return { ok: true, issues: [], failedChunks: 0, lastError: null };
+        return {
+            ok: true,
+            issues: [],
+            failedChunks: 0,
+            lastError: null,
+            chunkCount: 0,
+            lastSampleResponse: null
+        };
     }
 
     for (let i = 0; i < chunks.length; i++) {
@@ -229,6 +237,12 @@ export async function scanDocument({ text, callAi, signal, onProgress, targetWor
             failedChunks += 1;
             lastError = 'empty response';
         } else {
+            // Save the first content body so the UI can show a sample when
+            // the scan returns 0 findings — helps tell "model behaving" from
+            // "model misbehaving" without opening DevTools.
+            if (lastSampleResponse === null) {
+                lastSampleResponse = result.content.slice(0, 200);
+            }
             const findings = parseScanResponse(result.content);
             if (findings.length === 0 && result.content.trim().length > 0 && !result.content.includes('"findings"')) {
                 // The model returned text but no parseable findings array —
@@ -241,5 +255,12 @@ export async function scanDocument({ text, callAi, signal, onProgress, targetWor
         }
         onProgress?.({ current: i + 1, total: chunks.length, issues: allIssues });
     }
-    return { ok: true, issues: allIssues, failedChunks, lastError };
+    return {
+        ok: true,
+        issues: allIssues,
+        failedChunks,
+        lastError,
+        chunkCount: chunks.length,
+        lastSampleResponse
+    };
 }
