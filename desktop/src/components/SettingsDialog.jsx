@@ -61,15 +61,35 @@ function SettingsDialog({ settings, onCancel, onSave }) {
 
                 <div className="modal-section">
                     <label htmlFor="spePath">SPE Rules Path</label>
-                    <input
-                        id="spePath"
-                        type="text"
-                        value={localSettings.spePath}
-                        onChange={event =>
-                            setLocalSettings(prev => ({ ...prev, spePath: event.target.value }))
-                        }
-                        placeholder="/path/to/spe_defaults"
-                    />
+                    <div className="inline-input-row">
+                        <input
+                            id="spePath"
+                            type="text"
+                            value={localSettings.spePath || ''}
+                            onChange={event =>
+                                setLocalSettings(prev => ({ ...prev, spePath: event.target.value }))
+                            }
+                            placeholder="Leave blank to use bundled defaults"
+                        />
+                        <button
+                            type="button"
+                            className="ghost-button"
+                            onClick={async () => {
+                                const picked = await window.api.chooseFolder();
+                                if (picked) {
+                                    setLocalSettings(prev => ({ ...prev, spePath: picked }));
+                                }
+                            }}
+                        >
+                            Browse…
+                        </button>
+                    </div>
+                    <p className="modal-hint">
+                        Point at your local <code>SPE-Config</code> directory (with
+                        {' '}<code>cliche_collider.yaml</code>, <code>name_collider.yaml</code>, etc.)
+                        to use rules you maintain yourself. Changes reload on save.
+                        Leave blank to fall back to the bundled defaults shipped with the app.
+                    </p>
                 </div>
 
                 <div className="modal-section">

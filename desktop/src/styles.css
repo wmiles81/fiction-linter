@@ -730,6 +730,39 @@ body {
     margin-top: 20px;
 }
 
+/* Label + input + button row — used for path pickers where the user can
+   either type a path or click Browse to pick one via the file dialog. */
+.inline-input-row {
+    display: flex;
+    gap: 8px;
+    align-items: stretch;
+}
+
+.inline-input-row input {
+    flex: 1;
+    min-width: 0;
+}
+
+.inline-input-row .ghost-button {
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.modal-hint {
+    margin: 6px 0 0;
+    font-size: 12px;
+    line-height: 1.45;
+    color: var(--muted, #5b5e67);
+}
+
+.modal-hint code {
+    padding: 1px 5px;
+    background: rgba(0, 0, 0, 0.05);
+    border-radius: 3px;
+    font-size: 11px;
+    font-family: 'SF Mono', 'Monaco', monospace;
+}
+
 @keyframes riseFade {
     from {
         transform: translateY(8px);

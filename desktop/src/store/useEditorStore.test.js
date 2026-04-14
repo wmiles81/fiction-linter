@@ -117,4 +117,60 @@ describe('useEditorStore', () => {
             window.api.readFile = originalReadFile;
         }
     });
+
+    it('hydrate keeps persisted content when the file is missing (gdoc/docx import recovery)', async () => {
+        // Simulates the scenario: user imported a .gdoc, which opened a tab
+        // with a synthetic sibling .md path that has never been saved. On
+        // restart, readFile for that path fails, but we have the original
+        // imported content in the persist file. The tab should come back
+        // marked dirty so the user knows Save is needed.
+        const fakePersisted = {
+            tabs: [
+                {
+                    id: 'tab-import',
+                    path: '/tmp/imported.md',
+                    name: 'imported.md',
+                    markdownSource: 'Full imported doc content.',
+                    dirty: false
+                }
+            ],
+            activeTabId: 'tab-import'
+        };
+        const originalLoadTabs = window.api.loadTabs;
+        const originalReadFile = window.api.readFile;
+        window.api.loadTabs = async () => fakePersisted;
+        window.api.readFile = async () => ({ ok: false, error: 'File not found.' });
+        try {
+            await useEditorStore.getState().hydrate();
+            const state = useEditorStore.getState();
+            expect(state.tabs).toHaveLength(1);
+            expect(state.tabs[0].markdownSource).toBe('Full imported doc content.');
+            expect(state.tabs[0].dirty).toBe(true);
+            expect(state.tabs[0].path).toBe('/tmp/imported.md');
+            expect(state.activeTabId).toBe('tab-import');
+        } finally {
+            window.api.loadTabs = originalLoadTabs;
+            window.api.readFile = originalReadFile;
+        }
+    });
+
+    it('hydrate drops tabs when the file is missing AND no cached content exists', async () => {
+        const fakePersisted = {
+            tabs: [
+                { id: 'gone', path: '/tmp/deleted.md', name: 'deleted.md', markdownSource: '', dirty: false }
+            ],
+            activeTabId: 'gone'
+        };
+        const originalLoadTabs = window.api.loadTabs;
+        const originalReadFile = window.api.readFile;
+        window.api.loadTabs = async () => fakePersisted;
+        window.api.readFile = async () => ({ ok: false, error: 'File not found.' });
+        try {
+            await useEditorStore.getState().hydrate();
+            expect(useEditorStore.getState().tabs).toEqual([]);
+        } finally {
+            window.api.loadTabs = originalLoadTabs;
+            window.api.readFile = originalReadFile;
+        }
+    });
 });

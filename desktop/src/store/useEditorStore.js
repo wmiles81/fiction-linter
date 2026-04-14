@@ -189,29 +189,50 @@ export const useEditorStore = create(withPersist((set, get) => ({
         if (typeof window === 'undefined' || !window.api?.loadTabs) return;
         try {
             const persisted = await window.api.loadTabs();
-            if (persisted?.tabs?.length) {
-                // Re-read files from disk to get current content — the persisted
-                // markdownSource may be stale if the user edited the file externally.
-                const rehydrated = [];
-                for (const t of persisted.tabs) {
-                    if (!t.path) {
-                        rehydrated.push(t);
-                        continue;
-                    }
-                    const r = await window.api.readFile(t.path);
-                    if (r.ok) {
-                        rehydrated.push({ ...t, markdownSource: r.contents, dirty: false });
-                    }
+            if (!persisted?.tabs?.length) return;
+
+            // Three rehydration paths:
+            //   1. No path (untitled draft) → keep persisted content, dirty.
+            //   2. Path + file exists → re-read fresh content, clean tab.
+            //   3. Path + file missing (deleted, moved, or a synthetic
+            //      sibling .md from a gdoc/docx import that was never
+            //      saved) → keep persisted content, mark dirty so the
+            //      user knows Save will create the file.
+            const rehydrated = [];
+            const drops = [];
+            for (const t of persisted.tabs) {
+                if (!t.path) {
+                    rehydrated.push(t);
+                    continue;
                 }
-                // Use raw setState (not wrapped) to avoid persisting a rehydration
-                // as a new write.
-                useEditorStore.setState({
-                    tabs: rehydrated,
-                    activeTabId: rehydrated.some(t => t.id === persisted.activeTabId)
-                        ? persisted.activeTabId
-                        : (rehydrated[0]?.id ?? null)
-                });
+                const r = await window.api.readFile(t.path);
+                if (r.ok) {
+                    rehydrated.push({ ...t, markdownSource: r.contents, dirty: false });
+                } else if (typeof t.markdownSource === 'string' && t.markdownSource.length > 0) {
+                    // File is missing but we have content from last session.
+                    // Keep the tab and its intended path — Save will create
+                    // the file. This is the .gdoc/.docx import recovery path.
+                    rehydrated.push({ ...t, dirty: true });
+                } else {
+                    // Truly nothing to restore — drop the tab and tell the
+                    // user (via console). Keeping it with empty content
+                    // would be more confusing than dropping it.
+                    drops.push(t.path);
+                }
             }
+            if (drops.length > 0) {
+                // eslint-disable-next-line no-console
+                console.warn('[tabs] dropped on hydrate (missing file, no cached content):', drops);
+            }
+
+            // Use raw setState (not wrapped) to avoid persisting a rehydration
+            // as a new write.
+            useEditorStore.setState({
+                tabs: rehydrated,
+                activeTabId: rehydrated.some(t => t.id === persisted.activeTabId)
+                    ? persisted.activeTabId
+                    : (rehydrated[0]?.id ?? null)
+            });
         } catch (err) {
             console.error('Tab hydration failed:', err);
         }
