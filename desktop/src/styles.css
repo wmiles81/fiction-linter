@@ -1213,6 +1213,13 @@ body {
     white-space: normal;
     word-wrap: break-word;
     border-left: 3px solid #888;
+    /* Anchor: handleMouseMove sets (x, y) to the horizontal-center and
+       top-edge of the flagged range. This transform places the tooltip
+       so its bottom edge sits just above the flagged text and its
+       horizontal center aligns with the range's center. Moving the mouse
+       anywhere within the same flagged range does NOT move the tooltip,
+       so the user can aim at the Fix buttons without it dodging away. */
+    transform: translate(-50%, -100%);
 }
 
 .lint-tooltip.error {

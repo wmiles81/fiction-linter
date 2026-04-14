@@ -48,6 +48,11 @@ const Editor = forwardRef(function Editor({
     // lands on the tooltip itself. Without this, the tooltip would close
     // before the user could reach its buttons.
     const tooltipHideTimerRef = useRef(null);
+    // Remembers which finding the tooltip is currently anchored to, by
+    // "start-end" key. When a mousemove over the SAME finding fires, we
+    // leave the tooltip alone — otherwise the tooltip would chase the
+    // cursor and flee from the user's mouse as they try to click a button.
+    const pinnedFindingKeyRef = useRef(null);
     // Track in-flight fix so the buttons can show "Fixing…" and avoid
     // double-clicks during the AI rewrite round-trip.
     const [fixInFlight, setFixInFlight] = useState(false);
@@ -153,6 +158,28 @@ const Editor = forwardRef(function Editor({
         return () => document.removeEventListener('selectionchange', handleSelectionChange);
     }, [handleSelectionChange]);
 
+    // Bridge-timer helpers: scheduleHideTooltip queues a 180ms delayed close
+    // (so mouse-travel onto the tooltip has time to cancel it),
+    // cancelHideTooltip aborts the pending close. These must be declared
+    // BEFORE handleMouseMove and handleMouseLeave because both reference
+    // them in their useCallback dependency arrays — const is subject to
+    // the Temporal Dead Zone.
+    const scheduleHideTooltip = useCallback(() => {
+        if (tooltipHideTimerRef.current) clearTimeout(tooltipHideTimerRef.current);
+        tooltipHideTimerRef.current = setTimeout(() => {
+            tooltipHideTimerRef.current = null;
+            setHoverFinding(null);
+            pinnedFindingKeyRef.current = null;
+        }, 180);
+    }, []);
+
+    const cancelHideTooltip = useCallback(() => {
+        if (tooltipHideTimerRef.current) {
+            clearTimeout(tooltipHideTimerRef.current);
+            tooltipHideTimerRef.current = null;
+        }
+    }, []);
+
     // Hover-tooltip lookup: convert mouse coordinates back into a plain-text
     // offset and check whether any finding's range contains it. Throttled to
     // once per animation frame to keep mousemove cheap (caret lookups + map
@@ -173,40 +200,55 @@ const Editor = forwardRef(function Editor({
             // in Electron (Chromium) so caretRangeFromPoint is correct.
             const caretRange = document.caretRangeFromPoint?.(clientX, clientY);
             if (!caretRange || !editorRef.current.contains(caretRange.startContainer)) {
-                setHoverFinding(null);
+                // Mouse is outside the editor text entirely (e.g., over
+                // padding). Schedule close via the bridge so the tooltip
+                // stays long enough to be reachable.
+                pinnedFindingKeyRef.current = null;
+                scheduleHideTooltip();
                 return;
             }
             const { map } = buildOffsetMap(editorRef.current);
             const offset = offsetForNode(map, caretRange.startContainer, caretRange.startOffset);
             const finding = findingAtOffset(issues, offset);
-            if (finding) {
-                setHoverFinding(finding);
-                // Offset the tooltip slightly down-and-right of the cursor so
-                // it does not obscure the text being hovered.
-                setTooltipPos({ x: clientX + 14, y: clientY + 18 });
-            } else {
-                setHoverFinding(null);
+            if (!finding) {
+                // Over non-flagged text — start the hide bridge. The user
+                // might be moving the mouse UP toward the tooltip; give them
+                // 180ms to land on it before we close.
+                pinnedFindingKeyRef.current = null;
+                scheduleHideTooltip();
+                return;
             }
+            const findingKey = `${finding.start}-${finding.end}`;
+            if (pinnedFindingKeyRef.current === findingKey) {
+                // Same finding as what's already shown — LEAVE POSITION ALONE.
+                // Without this the tooltip chases the cursor and the user
+                // can never reach its buttons. Also cancel any pending
+                // hide (they re-entered the flagged range).
+                cancelHideTooltip();
+                return;
+            }
+            // New finding (or first time) — anchor the tooltip to the
+            // range's bounding rect. Centered horizontally over the flagged
+            // text, 8px above it. CSS transform: translate(-50%, -100%)
+            // places the tooltip's bottom-center at this point.
+            cancelHideTooltip();
+            pinnedFindingKeyRef.current = findingKey;
+            const range = rangeFromOffsets(map, finding.start, finding.end);
+            if (range) {
+                const rect = range.getBoundingClientRect();
+                setTooltipPos({
+                    x: rect.left + rect.width / 2,
+                    y: rect.top - 8
+                });
+            } else {
+                // Very defensive fallback — rangeFromOffsets is robust, but
+                // if it somehow returns null we still want the tooltip to
+                // show somewhere reasonable.
+                setTooltipPos({ x: clientX, y: clientY + 18 });
+            }
+            setHoverFinding(finding);
         });
-    }, [showFindings, issues]);
-
-    // Schedule a tooltip close on a short delay so the user can move their
-    // mouse onto the tooltip to click its buttons. Any mouseenter on the
-    // tooltip cancels the scheduled close.
-    const scheduleHideTooltip = useCallback(() => {
-        if (tooltipHideTimerRef.current) clearTimeout(tooltipHideTimerRef.current);
-        tooltipHideTimerRef.current = setTimeout(() => {
-            tooltipHideTimerRef.current = null;
-            setHoverFinding(null);
-        }, 180);
-    }, []);
-
-    const cancelHideTooltip = useCallback(() => {
-        if (tooltipHideTimerRef.current) {
-            clearTimeout(tooltipHideTimerRef.current);
-            tooltipHideTimerRef.current = null;
-        }
-    }, []);
+    }, [showFindings, issues, scheduleHideTooltip, cancelHideTooltip]);
 
     const handleMouseLeave = useCallback(() => {
         if (hoverRafRef.current !== null) {
