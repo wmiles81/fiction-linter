@@ -449,6 +449,83 @@ function App() {
         editorRef.current.jumpTo(next);
     };
 
+    // Build an annotation entry payload from a lint finding. Used by both
+    // Fix-later (note = finding message) and Fix-now (note = rewrite result).
+    const buildFindingEntry = (finding, noteOverride) => {
+        const plain = editorRef.current?.getPlainText?.() || content;
+        const original = plain.slice(finding.start, finding.end);
+        return {
+            line: finding.line || 1,
+            category: finding.category || 'unknown',
+            severity: finding.severity || 'info',
+            original,
+            note: noteOverride || finding.message || '',
+            source: finding.source || 'pattern'
+        };
+    };
+
+    // Fix later: log the original text + the finding message to the sibling
+    // annotation file and leave the editor untouched. The user can later
+    // feed the pair (source + annotation) to another AI for rewrites.
+    const handleFixLater = async (finding) => {
+        if (!activeTab?.path) {
+            setStatus('Save the document first — annotations need a sibling file path.');
+            return;
+        }
+        const entry = buildFindingEntry(finding);
+        const result = await window.api.appendAnnotation(activeTab.path, entry);
+        if (result?.ok) {
+            setStatus(`Logged to annotation file: ${result.annotationPath}`);
+        } else {
+            setStatus(`Annotation failed: ${result?.error || 'unknown error'}`);
+        }
+    };
+
+    // Fix now: call AI rewrite, extract the first suggestion, replace the
+    // flagged range in the editor, and ALSO log the before/after pair to
+    // the annotation file so there's a durable record of what changed.
+    const handleFixNow = async (finding) => {
+        if (!activeTab?.path) {
+            setStatus('Save the document first — Fix now needs a sibling annotation file path.');
+            return;
+        }
+        const plain = editorRef.current?.getPlainText?.() || content;
+        const original = plain.slice(finding.start, finding.end);
+        // Use the surrounding sentence as snippet context (50 chars either
+        // side is a cheap approximation; the AI prompt just needs context).
+        const snippetStart = Math.max(0, finding.start - 80);
+        const snippetEnd = Math.min(plain.length, finding.end + 80);
+        const snippet = plain.slice(snippetStart, snippetEnd);
+
+        setStatus('Fix now — asking AI for a rewrite…');
+        const result = await window.api.aiComplete({
+            kind: 'rewrite',
+            finding: { message: finding.message, severity: finding.severity },
+            snippet
+        });
+        if (!result?.ok) {
+            setStatus(`Fix now failed: ${result?.error || 'unknown error'}`);
+            return;
+        }
+        const firstAlt = extractFirstRewrite(result.content);
+        if (!firstAlt) {
+            setStatus('Fix now: AI returned no usable rewrite; logged for later.');
+            await window.api.appendAnnotation(activeTab.path, buildFindingEntry(finding,
+                `AI returned no parseable rewrite. Raw response:\n\n${result.content}`));
+            return;
+        }
+        // The rewrite typically rewrites the whole sentence, not the exact
+        // flagged substring. Apply it AS the replacement for the flagged
+        // range — the user can edit further if the scope is off.
+        const before = plain.slice(0, finding.start);
+        const after = plain.slice(finding.end);
+        const newMarkdown = before + firstAlt + after;
+        updateContent(newMarkdown);
+        await window.api.appendAnnotation(activeTab.path, buildFindingEntry(finding,
+            `Replaced "${original}" with "${firstAlt}" via Fix now.`));
+        setStatus(`Fix applied and logged. ${activeTab.path}.annotation.md`);
+    };
+
     const handleSave = async () => {
         if (!activeTab?.path) return;
         const result = await window.api.writeFile(activeTab.path, activeTab.markdownSource);
@@ -645,6 +722,8 @@ function App() {
                         onStateChange={setEditorState}
                         wrap={wrap}
                         onToggleWrap={() => setWrap(w => !w)}
+                        onFixLater={handleFixLater}
+                        onFixNow={handleFixNow}
                     />
                 </main>
             </div>
@@ -704,6 +783,19 @@ function indexToLineCol(text, index) {
     const line = lines.length;
     const column = lines[lines.length - 1].length + 1;
     return { line, column };
+}
+
+// The rewrite prompt asks the model to return three alternatives prefixed
+// "1.", "2.", "3.". Extract the FIRST alternative's text for a Fix-now
+// apply. Defensive against leading whitespace, markdown fences, and
+// variations in the prefix ("1)", "1:"), but returns null when no numbered
+// line is found — the caller surfaces that and logs the raw response.
+export function extractFirstRewrite(raw) {
+    if (!raw || typeof raw !== 'string') return null;
+    const cleaned = raw.replace(/^```[a-z]*\s*/i, '').replace(/\s*```\s*$/i, '').trim();
+    const match = cleaned.match(/^\s*1[.):]\s*(.+?)(?=\n\s*2[.):]|\n{2,}|$)/s);
+    if (!match) return null;
+    return match[1].trim().replace(/^["'"]+|["'"]+$/g, '');
 }
 
 export default App;

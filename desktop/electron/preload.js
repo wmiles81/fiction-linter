@@ -16,6 +16,8 @@ contextBridge.exposeInMainWorld('api', {
     loadSpeData: spePath => ipcRenderer.invoke('spe:load', spePath),
     aiComplete: payload => ipcRenderer.invoke('ai:complete', payload),
     aiScan: paragraph => ipcRenderer.invoke('ai:scan', { paragraph }),
+    appendAnnotation: (sourcePath, entry) =>
+        ipcRenderer.invoke('annotation:append', { sourcePath, entry }),
     fetchModels: config => ipcRenderer.invoke('models:fetch', config),
     loadTabs: () => ipcRenderer.invoke('tabs:load'),
     saveTabs: state => ipcRenderer.invoke('tabs:save', state),

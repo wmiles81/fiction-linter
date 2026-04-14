@@ -312,6 +312,73 @@ ipcMain.handle('fs:writeFile', async (_event, payload) => {
     }
 });
 
+// Derive the sibling annotation file path from a source document path.
+// `/foo/chapter1.md` → `/foo/chapter1.md.annotation.md`
+// We include the double extension deliberately: ".annotation" signals intent,
+// ".md" keeps it editor-friendly so the user can hand original + annotation
+// to an AI for further work without any format conversion.
+function annotationPathFor(sourcePath) {
+    if (!sourcePath) return null;
+    return `${sourcePath}.annotation.md`;
+}
+
+// Format a single annotation entry as markdown. Kept structured so future
+// tooling (or another AI) can parse it, but still human-readable.
+function formatAnnotationEntry({ line, category, severity, original, note, source }) {
+    const header = ['##', `L${line}`];
+    if (category) header.push(`— ${category}`);
+    if (severity) header.push(`(${severity})`);
+    const parts = [
+        header.join(' '),
+        '',
+        '**Original:**',
+        '> ' + (original || '').split('\n').join('\n> '),
+        '',
+        '**Note:**',
+        note || '',
+    ];
+    if (source) {
+        parts.push('', `_source: ${source}_`);
+    }
+    parts.push('', '---', '');
+    return parts.join('\n');
+}
+
+// Append an annotation to the sibling file for the given source document.
+// Creates the file with a header if it does not yet exist.
+ipcMain.handle('annotation:append', async (_event, payload) => {
+    const { sourcePath, entry } = payload || {};
+    if (!sourcePath || typeof sourcePath !== 'string') {
+        return { ok: false, error: 'Missing sourcePath.' };
+    }
+    if (!entry || typeof entry !== 'object') {
+        return { ok: false, error: 'Missing entry payload.' };
+    }
+    const annotationPath = annotationPathFor(sourcePath);
+    try {
+        let contents = '';
+        if (fs.existsSync(annotationPath)) {
+            contents = fs.readFileSync(annotationPath, 'utf8');
+        } else {
+            const sourceName = path.basename(sourcePath);
+            contents = [
+                `# Annotations for ${sourceName}`,
+                '',
+                '<!-- Maintained by Fiction Linter. Each section below is one annotation. -->',
+                '',
+                '---',
+                '',
+                ''
+            ].join('\n');
+        }
+        contents += formatAnnotationEntry(entry);
+        fs.writeFileSync(annotationPath, contents, 'utf8');
+        return { ok: true, annotationPath };
+    } catch (error) {
+        return { ok: false, error: error.message };
+    }
+});
+
 // Read a .docx file as binary, run mammoth to convert to HTML. The renderer
 // then converts that HTML to markdown via the existing editor/converters.js
 // `htmlToMarkdown` (the same pipeline as paste handling), so .docx import

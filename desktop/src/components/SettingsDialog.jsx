@@ -1,6 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import ModelPicker from './ModelPicker';
 
+function countEntries(obj) {
+    if (!obj || typeof obj !== 'object') return 0;
+    return Object.keys(obj).length;
+}
+
 function SettingsDialog({ settings, onCancel, onSave }) {
     const [localSettings, setLocalSettings] = useState({
         ...settings,
@@ -13,6 +18,10 @@ function SettingsDialog({ settings, onCancel, onSave }) {
     const [models, setModels] = useState([]);
     const [loadingModels, setLoadingModels] = useState(false);
     const [modelError, setModelError] = useState(null);
+    // Live preview of the SPE rule counts for the currently-entered path,
+    // so users know they picked a valid SPE-Config dir before clicking Save.
+    // null = haven't tried loading yet; {} = loaded empty; { counts, ... } = loaded.
+    const [speSummary, setSpeSummary] = useState(null);
 
     const { provider, baseUrl, apiKey, model, hyperparameters } = localSettings.ai;
 
@@ -43,6 +52,34 @@ function SettingsDialog({ settings, onCancel, onSave }) {
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
+
+    // Preview-load the SPE rule counts whenever spePath changes. Debounced
+    // so typing a path doesn't fire a load per keystroke. loadSpeData is
+    // idempotent and cheap — it just reads YAML from disk — so calling it
+    // purely for UI feedback is fine.
+    useEffect(() => {
+        const path = localSettings.spePath;
+        if (!path) {
+            setSpeSummary(null);
+            return;
+        }
+        let cancelled = false;
+        const handle = setTimeout(async () => {
+            try {
+                const data = await window.api.loadSpeData(path);
+                if (cancelled) return;
+                setSpeSummary({
+                    cliches: countEntries(data?.cliches),
+                    names: countEntries(data?.names),
+                    places: countEntries(data?.places),
+                    protocols: countEntries(data?.protocols)
+                });
+            } catch {
+                if (!cancelled) setSpeSummary({ error: true });
+            }
+        }, 300);
+        return () => { cancelled = true; clearTimeout(handle); };
+    }, [localSettings.spePath]);
 
     const updateAi = (field, value) => {
         setLocalSettings(prev => ({
@@ -90,6 +127,24 @@ function SettingsDialog({ settings, onCancel, onSave }) {
                         to use rules you maintain yourself. Changes reload on save.
                         Leave blank to fall back to the bundled defaults shipped with the app.
                     </p>
+                    {speSummary ? (
+                        speSummary.error ? (
+                            <p className="modal-hint spe-summary error">
+                                Could not read SPE data from this path.
+                            </p>
+                        ) : (
+                            <p className="modal-hint spe-summary">
+                                Loaded:
+                                {' '}<strong>{speSummary.cliches}</strong> cliche rules,
+                                {' '}<strong>{speSummary.names}</strong> name rules,
+                                {' '}<strong>{speSummary.places}</strong> place rules,
+                                {' '}<strong>{speSummary.protocols}</strong> protocol entries.
+                                {speSummary.cliches + speSummary.names + speSummary.places + speSummary.protocols === 0 ? (
+                                    <> — <em>empty; check the folder contains the expected YAML files.</em></>
+                                ) : null}
+                            </p>
+                        )
+                    ) : null}
                 </div>
 
                 <div className="modal-section">

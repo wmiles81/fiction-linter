@@ -34,13 +34,23 @@ const Editor = forwardRef(function Editor({
     onSave,
     onStateChange,
     wrap,
-    onToggleWrap
+    onToggleWrap,
+    onFixLater,
+    onFixNow
 }, ref) {
     const editorRef = useRef(null);
     const isSettingContentRef = useRef(false);
     // Track the last markdown we emitted so we can ignore the re-entry
     // that happens when the parent echoes value back.
     const lastEmittedRef = useRef(null);
+    // "Hover bridge" timeout — a mouseleave on the flagged text schedules
+    // a tooltip close, but the scheduled close is cancelled if the mouse
+    // lands on the tooltip itself. Without this, the tooltip would close
+    // before the user could reach its buttons.
+    const tooltipHideTimerRef = useRef(null);
+    // Track in-flight fix so the buttons can show "Fixing…" and avoid
+    // double-clicks during the AI rewrite round-trip.
+    const [fixInFlight, setFixInFlight] = useState(false);
 
     // Hover-tooltip state for inline lint warnings.
     // hoverFinding is the finding currently under the cursor (or null).
@@ -180,13 +190,33 @@ const Editor = forwardRef(function Editor({
         });
     }, [showFindings, issues]);
 
+    // Schedule a tooltip close on a short delay so the user can move their
+    // mouse onto the tooltip to click its buttons. Any mouseenter on the
+    // tooltip cancels the scheduled close.
+    const scheduleHideTooltip = useCallback(() => {
+        if (tooltipHideTimerRef.current) clearTimeout(tooltipHideTimerRef.current);
+        tooltipHideTimerRef.current = setTimeout(() => {
+            tooltipHideTimerRef.current = null;
+            setHoverFinding(null);
+        }, 180);
+    }, []);
+
+    const cancelHideTooltip = useCallback(() => {
+        if (tooltipHideTimerRef.current) {
+            clearTimeout(tooltipHideTimerRef.current);
+            tooltipHideTimerRef.current = null;
+        }
+    }, []);
+
     const handleMouseLeave = useCallback(() => {
         if (hoverRafRef.current !== null) {
             cancelAnimationFrame(hoverRafRef.current);
             hoverRafRef.current = null;
         }
-        setHoverFinding(null);
-    }, []);
+        // Don't clear immediately — let the bridge timer run so mouse
+        // travel onto the tooltip keeps it open.
+        scheduleHideTooltip();
+    }, [scheduleHideTooltip]);
 
     // Hide the tooltip if showFindings flips to false while we're hovering
     // (toggling from Findings to Silent in the status bar mid-hover).
@@ -321,9 +351,51 @@ const Editor = forwardRef(function Editor({
                 <div
                     className={`lint-tooltip ${hoverFinding.severity || 'info'}`}
                     style={{ left: `${tooltipPos.x}px`, top: `${tooltipPos.y}px` }}
-                    role="tooltip"
+                    role="dialog"
+                    aria-label="Finding details"
+                    // Hover-bridge: while the mouse is over the tooltip,
+                    // cancel the pending close so buttons remain clickable.
+                    onMouseEnter={cancelHideTooltip}
+                    onMouseLeave={scheduleHideTooltip}
                 >
-                    {hoverFinding.message}
+                    <div className="lint-tooltip-message">{hoverFinding.message}</div>
+                    {(onFixLater || onFixNow) ? (
+                        <div className="lint-tooltip-actions">
+                            {onFixNow ? (
+                                <button
+                                    type="button"
+                                    className="lint-tooltip-btn primary"
+                                    disabled={fixInFlight}
+                                    onClick={async () => {
+                                        if (!onFixNow || fixInFlight) return;
+                                        setFixInFlight(true);
+                                        try {
+                                            await onFixNow(hoverFinding);
+                                        } finally {
+                                            setFixInFlight(false);
+                                            setHoverFinding(null);
+                                        }
+                                    }}
+                                >
+                                    {fixInFlight ? 'Fixing…' : 'Fix now'}
+                                </button>
+                            ) : null}
+                            {onFixLater ? (
+                                <button
+                                    type="button"
+                                    className="lint-tooltip-btn"
+                                    disabled={fixInFlight}
+                                    onClick={async () => {
+                                        if (!onFixLater) return;
+                                        await onFixLater(hoverFinding);
+                                        setHoverFinding(null);
+                                    }}
+                                >
+                                    Fix later
+                                </button>
+                            ) : null}
+                        </div>
+                    ) : null}
                 </div>
             ) : null}
         </section>
