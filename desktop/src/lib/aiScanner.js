@@ -115,19 +115,29 @@ export const AI_CATEGORY_SEVERITY = {
  * Translate chunk-scoped AI findings to document-scoped issues matching
  * the pattern-finding shape expected by the lint overlay.
  *
- *   { start, end, message, severity, category, source: 'ai' }
+ *   { start, end, text, line, message, severity, category, source: 'ai' }
  *
  * `chunk` shape: { text, start, end } — same as a paragraph, but covering
  * possibly multiple paragraphs joined by their original separators.
+ *
+ * `fullText` is the entire document plain text. Required to compute the
+ * line number of each finding. Without it, annotation logs fall back to
+ * L1 for every finding. `text` (the exact flagged substring) is stored so
+ * Fix Now can validate offsets before applying — stale findings get
+ * refused instead of silently corrupting the document.
  */
-export function toDocumentIssues(chunk, findings) {
+export function toDocumentIssues(chunk, findings, fullText) {
     const issues = [];
     for (const f of findings) {
         const localIdx = chunk.text.indexOf(f.text);
         if (localIdx < 0) continue; // AI hallucinated text not in the chunk
+        const start = chunk.start + localIdx;
+        const end = start + f.text.length;
         issues.push({
-            start: chunk.start + localIdx,
-            end: chunk.start + localIdx + f.text.length,
+            start,
+            end,
+            text: f.text,
+            line: lineOfOffset(fullText, start),
             message: f.message || `AI flagged: ${f.category}`,
             severity: AI_CATEGORY_SEVERITY[f.category] || 'info',
             category: f.category,
@@ -135,6 +145,18 @@ export function toDocumentIssues(chunk, findings) {
         });
     }
     return issues;
+}
+
+// Count newlines from the start of the text up to the offset. Line numbers
+// are 1-indexed. Cheap — only called per finding, not per render.
+function lineOfOffset(fullText, offset) {
+    if (!fullText || offset <= 0) return 1;
+    let lineCount = 1;
+    const limit = Math.min(offset, fullText.length);
+    for (let i = 0; i < limit; i++) {
+        if (fullText.charCodeAt(i) === 10) lineCount++;
+    }
+    return lineCount;
 }
 
 // Ranking used by "Next finding" navigation and any severity-sorted views.
@@ -374,7 +396,7 @@ export async function scanDocument({ text, callAi, signal, onProgress, targetWor
                 failedChunks += 1;
                 lastError = 'response was not valid findings JSON';
             }
-            const chunkIssues = toDocumentIssues(chunk, findings);
+            const chunkIssues = toDocumentIssues(chunk, findings, text);
             allIssues.push(...chunkIssues);
         }
         // CRITICAL: pass a NEW array reference, not allIssues itself.

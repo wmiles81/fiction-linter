@@ -119,6 +119,36 @@ describe('toDocumentIssues', () => {
         expect(issues[2].severity).toBe('info');    // over-explanation → info
     });
 
+    it('stores the original flagged text as `text` for later staleness checks', () => {
+        const paragraph = { text: 'She felt sad.', start: 0, end: 13 };
+        const findings = [{ text: 'felt sad', category: 'x', message: 'y' }];
+        const issues = toDocumentIssues(paragraph, findings);
+        expect(issues[0].text).toBe('felt sad');
+    });
+
+    it('computes line number from fullText when provided', () => {
+        // Three paragraphs separated by blank lines. Target is in paragraph 3
+        // which starts at plain-text line 5 (1: first para, 2: blank,
+        // 3: second para, 4: blank, 5: third para).
+        const fullText = 'First paragraph.\n\nSecond paragraph.\n\nShe felt sad here.';
+        // chunk covers the third paragraph only
+        const chunk = {
+            text: 'She felt sad here.',
+            start: fullText.indexOf('She felt'),
+            end: fullText.length
+        };
+        const findings = [{ text: 'felt sad', category: 'emotional-telling', message: 'x' }];
+        const issues = toDocumentIssues(chunk, findings, fullText);
+        expect(issues[0].line).toBe(5);
+    });
+
+    it('defaults line to 1 when fullText is not provided (backwards compat)', () => {
+        const paragraph = { text: 'hi there.', start: 0, end: 9 };
+        const findings = [{ text: 'hi', category: 'x', message: 'y' }];
+        const issues = toDocumentIssues(paragraph, findings);
+        expect(issues[0].line).toBe(1);
+    });
+
     it('AI_CATEGORY_SEVERITY exposes the full mapping', () => {
         expect(AI_CATEGORY_SEVERITY).toMatchObject({
             'show-vs-tell': 'error',

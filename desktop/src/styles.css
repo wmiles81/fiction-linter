@@ -1192,6 +1192,70 @@ body {
     overflow-x: auto;
 }
 
+/*
+ * Line numbers gutter — toggled via the status bar.
+ *
+ * Uses CSS counters on BLOCK elements (p, div, h1-6, blockquote, pre, li).
+ * This numbers each rendered paragraph rather than each plain-text newline —
+ * for fiction prose the two usually match up, and block-based numbering is
+ * what users intuit ("paragraph 3 = line 3"). The gutter sits in the left
+ * padding so the main text flow is undisturbed.
+ *
+ * Numbers are intentionally muted (50% opacity) so they don't compete with
+ * the prose; they're a wayfinding aid, not the star of the show.
+ */
+.editor-surface.with-line-numbers {
+    counter-reset: editor-lineno;
+    padding-left: 64px;
+}
+
+.editor-surface.with-line-numbers > p,
+.editor-surface.with-line-numbers > div,
+.editor-surface.with-line-numbers > h1,
+.editor-surface.with-line-numbers > h2,
+.editor-surface.with-line-numbers > h3,
+.editor-surface.with-line-numbers > h4,
+.editor-surface.with-line-numbers > h5,
+.editor-surface.with-line-numbers > h6,
+.editor-surface.with-line-numbers > blockquote,
+.editor-surface.with-line-numbers > pre,
+.editor-surface.with-line-numbers > ul,
+.editor-surface.with-line-numbers > ol {
+    counter-increment: editor-lineno;
+    position: relative;
+}
+
+.editor-surface.with-line-numbers > p::before,
+.editor-surface.with-line-numbers > div::before,
+.editor-surface.with-line-numbers > h1::before,
+.editor-surface.with-line-numbers > h2::before,
+.editor-surface.with-line-numbers > h3::before,
+.editor-surface.with-line-numbers > h4::before,
+.editor-surface.with-line-numbers > h5::before,
+.editor-surface.with-line-numbers > h6::before,
+.editor-surface.with-line-numbers > blockquote::before,
+.editor-surface.with-line-numbers > pre::before,
+.editor-surface.with-line-numbers > ul::before,
+.editor-surface.with-line-numbers > ol::before {
+    content: counter(editor-lineno);
+    position: absolute;
+    left: -44px;
+    width: 32px;
+    text-align: right;
+    color: var(--g-text-muted, #6b655b);
+    opacity: 0.5;
+    font-family: 'SF Mono', 'Menlo', 'Monaco', monospace;
+    font-size: 11px;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    top: 0.4em;
+    /* Don't interfere with the contenteditable selection or copy behavior —
+       ::before is a pseudo-element, already non-selectable by default,
+       but making it explicit is defensive. */
+    user-select: none;
+    pointer-events: none;
+}
+
 /* Inline lint warning tooltip — appears on hover over a highlighted finding.
  * Position is set inline (viewport-relative pixel coordinates from a
  * mousemove handler in Editor.jsx). pointer-events: none so the tooltip

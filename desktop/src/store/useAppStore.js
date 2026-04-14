@@ -14,6 +14,7 @@ export const THEMES = [
 
 const THEME_STORAGE_KEY = 'fl.theme';
 const DEFAULT_THEME = 'parchment';
+const LINE_NUMBERS_STORAGE_KEY = 'fl.showLineNumbers';
 
 function readStoredTheme() {
     if (typeof window === 'undefined') return DEFAULT_THEME;
@@ -22,6 +23,15 @@ function readStoredTheme() {
         if (stored && THEMES.some(t => t.id === stored)) return stored;
     } catch { /* private mode — fall through */ }
     return DEFAULT_THEME;
+}
+
+function readStoredLineNumbers() {
+    if (typeof window === 'undefined') return false;
+    try {
+        return window.localStorage.getItem(LINE_NUMBERS_STORAGE_KEY) === 'true';
+    } catch {
+        return false;
+    }
 }
 
 // Apply the theme by setting the data-theme attribute on <html>. CSS
@@ -38,6 +48,7 @@ export const useAppStore = create((set, get) => ({
     rootPath: '',
     tree: [],
     theme: readStoredTheme(),
+    showLineNumbers: readStoredLineNumbers(),
 
     setSettings: (settings) => set({ settings }),
     setSpeData: (speData) => set({ speData: speData || emptySpeData }),
@@ -58,6 +69,14 @@ export const useAppStore = create((set, get) => ({
     // before the user sees a flash of the default styling.
     hydrateTheme: () => {
         applyThemeToDocument(get().theme);
+    },
+
+    setShowLineNumbers: (value) => {
+        const next = !!value;
+        try {
+            window.localStorage.setItem(LINE_NUMBERS_STORAGE_KEY, next ? 'true' : 'false');
+        } catch { /* non-fatal */ }
+        set({ showLineNumbers: next });
     },
 
     updateNode: (nodePath, updater) => {

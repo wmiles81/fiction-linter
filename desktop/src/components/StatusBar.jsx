@@ -19,7 +19,9 @@ function StatusBar({
     onToggleFindings,
     scanProgress,
     onToggleAiScan,
-    onJumpNextFinding
+    onJumpNextFinding,
+    showLineNumbers,
+    onToggleLineNumbers
 }) {
     const wordCount = useMemo(() => countWords(content), [content]);
     const charCount = content?.length ?? 0;
@@ -95,6 +97,18 @@ function StatusBar({
                 >
                     {showFindings ? 'Hide findings' : 'Show findings'}
                 </button>
+
+                {onToggleLineNumbers ? (
+                    <button
+                        type="button"
+                        className={`status-bar-toggle ${showLineNumbers ? 'on' : 'off'}`}
+                        onClick={onToggleLineNumbers}
+                        title={showLineNumbers ? 'Hide line numbers' : 'Show line numbers'}
+                        aria-label={`Click to ${showLineNumbers ? 'hide' : 'show'} line numbers`}
+                    >
+                        {showLineNumbers ? 'No #s' : 'Line #s'}
+                    </button>
+                ) : null}
 
                 <span className="status-bar-metric">{wordCount} words</span>
                 <span className="status-bar-metric">{charCount} chars</span>

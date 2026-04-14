@@ -36,7 +36,8 @@ const Editor = forwardRef(function Editor({
     wrap,
     onToggleWrap,
     onFixLater,
-    onFixNow
+    onFixNow,
+    showLineNumbers
 }, ref) {
     const editorRef = useRef(null);
     const isSettingContentRef = useRef(false);
@@ -380,7 +381,7 @@ const Editor = forwardRef(function Editor({
             />
             <div
                 ref={editorRef}
-                className={`editor-surface ${wrap ? 'wrap' : ''}`}
+                className={`editor-surface ${wrap ? 'wrap' : ''} ${showLineNumbers ? 'with-line-numbers' : ''}`}
                 contentEditable
                 suppressContentEditableWarning
                 onInput={handleInput}

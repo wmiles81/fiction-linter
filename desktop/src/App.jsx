@@ -26,6 +26,8 @@ function App() {
     const setRootPath = useAppStore(state => state.setRootPath);
     const setTree = useAppStore(state => state.setTree);
     const updateNode = useAppStore(state => state.updateNode);
+    const showLineNumbers = useAppStore(state => state.showLineNumbers);
+    const setShowLineNumbers = useAppStore(state => state.setShowLineNumbers);
 
     const tabs = useEditorStore(state => state.tabs);
     const activeTabId = useEditorStore(state => state.activeTabId);
@@ -236,6 +238,32 @@ function App() {
 
         return () => clearTimeout(handle);
     }, [lintEnabled, content, speData, patternCore, nameCore, settings, setIssues]);
+
+    // Drop stale AI findings whenever content changes. An AI finding is
+    // stale when the text at its offsets no longer matches the substring
+    // the AI flagged — pattern findings regenerate on each lint, but AI
+    // findings persist until the next scan. Without this cleanup the
+    // overlay keeps showing squiggles on shifted offsets, and Fix Now
+    // can corrupt the document ("LiLike" bug — finding said "Like" but
+    // after edits the offsets now point to "ke", and replacement leaves
+    // the unreplaced "Li" prefix behind).
+    //
+    // 150ms debounce matches the same intuition as the pattern lint: we
+    // want a quiet moment after typing before rebuilding overlays.
+    useEffect(() => {
+        if (aiIssues.length === 0) return;
+        const handle = setTimeout(() => {
+            const plain = editorRef.current?.getPlainText?.() || content;
+            const fresh = aiIssues.filter(i => {
+                if (!i.text) return true; // legacy finding without expected text — trust it
+                return plain.slice(i.start, i.end) === i.text;
+            });
+            if (fresh.length !== aiIssues.length) {
+                setAiIssues(fresh);
+            }
+        }, 150);
+        return () => clearTimeout(handle);
+    }, [content, aiIssues, setAiIssues]);
 
     // Shared between "user clicked Open" and "app restarted with persisted
     // rootPath." Lists the directory, updates store, and persists to BOTH
@@ -491,6 +519,20 @@ function App() {
         }
         const plain = editorRef.current?.getPlainText?.() || content;
         const original = plain.slice(finding.start, finding.end);
+
+        // Staleness guard: if the finding carries its expected flagged text
+        // and the text at those offsets no longer matches, the document has
+        // been edited since the scan and the offsets are wrong. Applying
+        // the replacement would corrupt the document ("LiLike" bug). Refuse
+        // the fix with a clear message.
+        if (finding.text && original !== finding.text) {
+            setStatus(
+                `Finding is stale — the document has changed since the scan. ` +
+                `Expected "${finding.text}" but offsets now point to "${original}". ` +
+                `Re-run the AI scan to refresh findings.`
+            );
+            return;
+        }
         // Use the surrounding sentence as snippet context (50 chars either
         // side is a cheap approximation; the AI prompt just needs context).
         const snippetStart = Math.max(0, finding.start - 80);
@@ -753,6 +795,7 @@ function App() {
                         onToggleWrap={() => setWrap(w => !w)}
                         onFixLater={handleFixLater}
                         onFixNow={handleFixNow}
+                        showLineNumbers={showLineNumbers}
                     />
                 </main>
             </div>
@@ -772,6 +815,8 @@ function App() {
                 scanProgress={scanProgress}
                 onToggleAiScan={handleToggleAiScan}
                 onJumpNextFinding={handleJumpNextFinding}
+                showLineNumbers={showLineNumbers}
+                onToggleLineNumbers={() => setShowLineNumbers(!showLineNumbers)}
             />
 
             {showSettings && settings ? (
