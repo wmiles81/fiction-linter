@@ -592,6 +592,15 @@ function App() {
                 onProgress: ({ current, total, issues: partial }) => {
                     setScanProgress({ current, total });
                     setAiIssues(partial);
+                },
+                onBackoff: ({ chunkIndex, totalChunks, attempt, waitMs, maxRetries }) => {
+                    // Surface in status so the user knows we're not hung.
+                    // (We keep scanProgress at the current position so the
+                    // button still shows the percent complete.)
+                    setStatus(
+                        `Rate limited on chunk ${chunkIndex + 1}/${totalChunks}. ` +
+                        `Retrying in ${Math.round(waitMs / 1000)}s (attempt ${attempt}/${maxRetries})…`
+                    );
                 }
             });
             // eslint-disable-next-line no-console
@@ -602,7 +611,9 @@ function App() {
                 // count so the user can tell "0 chunks" (text empty / unsplit)
                 // from "N chunks succeeded with 0 findings each" (model just
                 // didn't flag anything) from "N chunks failed" (rate-limited
-                // or auth issue).
+                // or auth issue). When retries kicked in, mention them —
+                // that's valuable signal ("I was getting rate-limited but we
+                // recovered").
                 const parts = [`AI scan: ${result.issues.length} finding${result.issues.length === 1 ? '' : 's'} across ${result.chunkCount} chunk${result.chunkCount === 1 ? '' : 's'}`];
                 if (result.failedChunks > 0) {
                     parts.push(
@@ -611,9 +622,10 @@ function App() {
                 } else if (result.chunkCount === 0) {
                     parts.push('— no scannable text found');
                 } else if (result.issues.length === 0 && result.lastSampleResponse) {
-                    // 0 findings with no failures: the model is responding
-                    // cleanly. Show a sample so the user can sanity-check.
                     parts.push(`— sample response: "${result.lastSampleResponse.slice(0, 60).replace(/\n/g, ' ')}…"`);
+                }
+                if (result.totalRetries > 0) {
+                    parts.push(`(${result.totalRetries} retr${result.totalRetries === 1 ? 'y' : 'ies'} after rate-limit backoff)`);
                 }
                 setStatus(parts.join(' '));
             } else if (result.error === 'Scan cancelled') {

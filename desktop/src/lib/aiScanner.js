@@ -180,6 +180,66 @@ function wordCount(text) {
     return trimmed.split(/\s+/).length;
 }
 
+// Promise-based sleep that respects an AbortSignal. Resolves on timeout,
+// rejects with 'aborted' if the signal fires first. Used by the chunk
+// retry backoff so a mid-wait cancel stops the scan immediately.
+function sleep(ms, signal) {
+    return new Promise((resolve, reject) => {
+        if (signal?.aborted) return reject(new Error('aborted'));
+        const id = setTimeout(() => {
+            if (signal) signal.removeEventListener?.('abort', onAbort);
+            resolve();
+        }, ms);
+        const onAbort = () => {
+            clearTimeout(id);
+            reject(new Error('aborted'));
+        };
+        signal?.addEventListener?.('abort', onAbort);
+    });
+}
+
+// A 429 response means "too many requests, try later" — universal across
+// OpenAI-compatible APIs. Match loosely on the status code in the error
+// string so provider-specific prefixes like "Provider returned error" or
+// "Request failed: 429" both qualify.
+export function isRateLimitError(err) {
+    if (!err || typeof err !== 'string') return false;
+    return err.includes('429');
+}
+
+/**
+ * Call the AI for one chunk, auto-retrying on 429 with exponential backoff.
+ *
+ * Strategy: initial delay 3s, double each retry (3, 6, 12), cap at 30s,
+ * max 3 retries. If the last retry still fails, return the final result.
+ * Any non-429 error is returned immediately — no point backing off for
+ * auth failures or malformed requests.
+ *
+ * onRetry is called BEFORE each sleep so the UI can show "Retrying in Ns…".
+ */
+export async function callChunkWithRetry({ callAi, chunkText, signal, onRetry, maxRetries = 3, baseDelayMs = 3000, maxDelayMs = 30000 }) {
+    let delay = baseDelayMs;
+    let retryCount = 0;
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        if (signal?.aborted) return { ok: false, error: 'Scan cancelled', retryCount };
+        const result = await callAi(chunkText);
+        if (result?.ok) return { ...result, retryCount };
+        if (attempt === maxRetries) return { ...result, retryCount };
+        if (!isRateLimitError(result?.error)) return { ...result, retryCount };
+        // Rate-limited and we still have attempts left — back off.
+        onRetry?.({ attempt: attempt + 1, waitMs: delay, maxRetries });
+        try {
+            await sleep(delay, signal);
+        } catch {
+            return { ok: false, error: 'Scan cancelled', retryCount };
+        }
+        retryCount += 1;
+        delay = Math.min(maxDelayMs, delay * 2);
+    }
+    // Unreachable: the loop always returns.
+    return { ok: false, error: 'retry loop exhausted', retryCount };
+}
+
 /**
  * Group paragraphs into chunks of roughly `targetWords` words each, never
  * splitting a paragraph. Chunks include the original document text from
@@ -250,11 +310,12 @@ export function chunkParagraphs(paragraphs, sourceText, targetWords = 2000) {
  *     useful for surfacing diagnostic info when the scan completed but
  *     produced no findings.
  */
-export async function scanDocument({ text, callAi, signal, onProgress, targetWords = 2000 }) {
+export async function scanDocument({ text, callAi, signal, onProgress, targetWords = 2000, onBackoff }) {
     const paragraphs = splitParagraphs(text);
     const chunks = chunkParagraphs(paragraphs, text, targetWords);
     const allIssues = [];
     let failedChunks = 0;
+    let totalRetries = 0;
     let lastError = null;
     let lastSampleResponse = null; // first content body, for debugging
 
@@ -263,6 +324,7 @@ export async function scanDocument({ text, callAi, signal, onProgress, targetWor
             ok: true,
             issues: [],
             failedChunks: 0,
+            totalRetries: 0,
             lastError: null,
             chunkCount: 0,
             lastSampleResponse: null
@@ -271,12 +333,24 @@ export async function scanDocument({ text, callAi, signal, onProgress, targetWor
 
     for (let i = 0; i < chunks.length; i++) {
         if (signal?.aborted) {
-            return { ok: false, error: 'Scan cancelled', issues: allIssues, failedChunks, lastError };
+            return { ok: false, error: 'Scan cancelled', issues: allIssues, failedChunks, totalRetries, lastError };
         }
         const chunk = chunks[i];
-        const result = await callAi(chunk.text);
+        // Ask the AI for this chunk with 429 auto-retry built in. onBackoff
+        // gives the UI a hook to show "Retrying in Ns…" so the user knows
+        // we're waiting on rate limits rather than hung.
+        const result = await callChunkWithRetry({
+            callAi,
+            chunkText: chunk.text,
+            signal,
+            onRetry: onBackoff
+                ? ({ attempt, waitMs, maxRetries }) =>
+                    onBackoff({ chunkIndex: i, totalChunks: chunks.length, attempt, waitMs, maxRetries })
+                : undefined
+        });
+        totalRetries += result.retryCount || 0;
         if (signal?.aborted) {
-            return { ok: false, error: 'Scan cancelled', issues: allIssues, failedChunks, lastError };
+            return { ok: false, error: 'Scan cancelled', issues: allIssues, failedChunks, totalRetries, lastError };
         }
         if (!result?.ok) {
             // Network/auth/rate-limit failure. Track it but keep going so a
@@ -315,6 +389,7 @@ export async function scanDocument({ text, callAi, signal, onProgress, targetWor
         ok: true,
         issues: allIssues,
         failedChunks,
+        totalRetries,
         lastError,
         chunkCount: chunks.length,
         lastSampleResponse

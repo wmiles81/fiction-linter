@@ -6,7 +6,9 @@ import {
     chunkParagraphs,
     scanDocument,
     findNextIssue,
-    AI_CATEGORY_SEVERITY
+    AI_CATEGORY_SEVERITY,
+    isRateLimitError,
+    callChunkWithRetry
 } from './aiScanner';
 
 describe('splitParagraphs', () => {
@@ -125,6 +127,85 @@ describe('toDocumentIssues', () => {
             'generic': 'warning',
             'over-explanation': 'info'
         });
+    });
+});
+
+describe('isRateLimitError', () => {
+    it('matches 429 anywhere in the error string', () => {
+        expect(isRateLimitError('429 Provider returned error')).toBe(true);
+        expect(isRateLimitError('Request failed: 429')).toBe(true);
+        expect(isRateLimitError('429 Too Many Requests')).toBe(true);
+    });
+    it('does not match unrelated errors', () => {
+        expect(isRateLimitError('401 Unauthorized')).toBe(false);
+        expect(isRateLimitError('Network error')).toBe(false);
+        expect(isRateLimitError('')).toBe(false);
+        expect(isRateLimitError(null)).toBe(false);
+    });
+});
+
+describe('callChunkWithRetry', () => {
+    it('returns immediately on success with retryCount 0', async () => {
+        const callAi = vi.fn(async () => ({ ok: true, content: '{"findings":[]}' }));
+        const result = await callChunkWithRetry({ callAi, chunkText: 'x', baseDelayMs: 1 });
+        expect(result.ok).toBe(true);
+        expect(result.retryCount).toBe(0);
+        expect(callAi).toHaveBeenCalledTimes(1);
+    });
+
+    it('retries on 429 then succeeds', async () => {
+        const callAi = vi.fn()
+            .mockResolvedValueOnce({ ok: false, error: '429 Too Many Requests' })
+            .mockResolvedValueOnce({ ok: true, content: '{"findings":[]}' });
+        const onRetry = vi.fn();
+        const result = await callChunkWithRetry({
+            callAi,
+            chunkText: 'x',
+            baseDelayMs: 1,
+            maxRetries: 3,
+            onRetry
+        });
+        expect(result.ok).toBe(true);
+        expect(result.retryCount).toBe(1);
+        expect(callAi).toHaveBeenCalledTimes(2);
+        expect(onRetry).toHaveBeenCalledTimes(1);
+    });
+
+    it('gives up after maxRetries and returns the last 429 result', async () => {
+        const callAi = vi.fn(async () => ({ ok: false, error: '429 rate limited' }));
+        const result = await callChunkWithRetry({
+            callAi,
+            chunkText: 'x',
+            baseDelayMs: 1,
+            maxRetries: 2
+        });
+        expect(result.ok).toBe(false);
+        expect(result.retryCount).toBe(2);
+        expect(callAi).toHaveBeenCalledTimes(3); // original + 2 retries
+    });
+
+    it('does not retry non-429 errors', async () => {
+        const callAi = vi.fn(async () => ({ ok: false, error: '401 Unauthorized' }));
+        const result = await callChunkWithRetry({ callAi, chunkText: 'x', baseDelayMs: 1 });
+        expect(result.ok).toBe(false);
+        expect(result.retryCount).toBe(0);
+        expect(callAi).toHaveBeenCalledTimes(1);
+    });
+
+    it('aborts mid-backoff if the signal fires', async () => {
+        const controller = new AbortController();
+        const callAi = vi.fn(async () => ({ ok: false, error: '429 rate limited' }));
+        const onRetry = vi.fn(() => controller.abort());
+        const result = await callChunkWithRetry({
+            callAi,
+            chunkText: 'x',
+            baseDelayMs: 100,
+            maxRetries: 3,
+            signal: controller.signal,
+            onRetry
+        });
+        expect(result.ok).toBe(false);
+        expect(result.error).toBe('Scan cancelled');
     });
 });
 
@@ -264,13 +345,16 @@ describe('scanDocument', () => {
     });
 
     it('counts failed chunks and returns the last error so the UI can surface it', async () => {
+        // Uses a non-retryable error (500) so the retry machinery does not
+        // turn each chunk into a 21s backoff sequence — the intent here is
+        // "terminal failures get counted", not "retry works".
         const text = 'one two three.\n\nfour five six.';
-        const callAi = vi.fn(async () => ({ ok: false, error: '429 rate limited' }));
+        const callAi = vi.fn(async () => ({ ok: false, error: '500 server error' }));
         const result = await scanDocument({ text, callAi, targetWords: 5 });
         expect(result.ok).toBe(true);
         expect(result.issues).toHaveLength(0);
         expect(result.failedChunks).toBe(2);
-        expect(result.lastError).toBe('429 rate limited');
+        expect(result.lastError).toBe('500 server error');
     });
 
     it('treats non-JSON responses as failures, not silent zero-findings', async () => {
@@ -284,5 +368,12 @@ describe('scanDocument', () => {
         expect(result.ok).toBe(true);
         expect(result.failedChunks).toBe(1);
         expect(result.lastError).toMatch(/findings JSON/);
+    });
+
+    it('returns totalRetries field (always present, even when zero)', async () => {
+        const text = 'hi.';
+        const callAi = async () => ({ ok: true, content: '{"findings":[]}' });
+        const result = await scanDocument({ text, callAi });
+        expect(result.totalRetries).toBe(0);
     });
 });
