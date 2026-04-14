@@ -4,7 +4,9 @@ import {
     parseScanResponse,
     toDocumentIssues,
     chunkParagraphs,
-    scanDocument
+    scanDocument,
+    findNextIssue,
+    AI_CATEGORY_SEVERITY
 } from './aiScanner';
 
 describe('splitParagraphs', () => {
@@ -100,6 +102,65 @@ describe('toDocumentIssues', () => {
         const paragraph = { text: 'The sky was blue.', start: 0, end: 17 };
         const findings = [{ text: 'beige unicorn', category: 'x', message: 'hallucinated' }];
         expect(toDocumentIssues(paragraph, findings)).toEqual([]);
+    });
+
+    it('maps AI categories to severities', () => {
+        const paragraph = { text: 'She felt sad and she was very generic.', start: 0, end: 38 };
+        const findings = [
+            { text: 'felt sad', category: 'emotional-telling', message: 'x' },
+            { text: 'very generic', category: 'generic', message: 'y' },
+            { text: 'was', category: 'over-explanation', message: 'z' }
+        ];
+        const issues = toDocumentIssues(paragraph, findings);
+        expect(issues[0].severity).toBe('error');   // emotional-telling → error
+        expect(issues[1].severity).toBe('warning'); // generic → warning
+        expect(issues[2].severity).toBe('info');    // over-explanation → info
+    });
+
+    it('AI_CATEGORY_SEVERITY exposes the full mapping', () => {
+        expect(AI_CATEGORY_SEVERITY).toMatchObject({
+            'show-vs-tell': 'error',
+            'emotional-telling': 'error',
+            'weak-phrasing': 'warning',
+            'generic': 'warning',
+            'over-explanation': 'info'
+        });
+    });
+});
+
+describe('findNextIssue', () => {
+    const issues = [
+        { start: 10,  end: 15,  severity: 'info'    }, // A
+        { start: 40,  end: 50,  severity: 'error'   }, // B — most severe
+        { start: 80,  end: 90,  severity: 'warning' }, // C
+        { start: 120, end: 125, severity: 'error'   }  // D — error later in doc
+    ];
+
+    it('picks the most severe issue after the cursor', () => {
+        // Cursor at 20: after = [B,C,D]. Most severe = B (error at 40).
+        const next = findNextIssue(issues, 20);
+        expect(next.start).toBe(40);
+    });
+
+    it('breaks severity ties by document position', () => {
+        // Cursor at 60: after = [C,D]. C is warning, D is error → D wins.
+        const next = findNextIssue(issues, 60);
+        expect(next.start).toBe(120);
+        // Cursor at 130: after = []. Wraps — most severe overall = B or D (both error).
+        // D is already been passed, but wrap picks by rank then position, so B wins.
+        const wrapped = findNextIssue(issues, 130);
+        expect(wrapped.start).toBe(40);
+    });
+
+    it('returns null for empty issues list', () => {
+        expect(findNextIssue([], 0)).toBe(null);
+        expect(findNextIssue(null, 0)).toBe(null);
+    });
+
+    it('wraps to the most severe issue when past the last one', () => {
+        const next = findNextIssue(issues, 999);
+        // Wraps — B (error at 40) outranks D (error at 120) by position.
+        expect(next.start).toBe(40);
     });
 });
 

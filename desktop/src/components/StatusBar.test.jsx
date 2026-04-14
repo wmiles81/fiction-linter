@@ -50,18 +50,23 @@ describe('StatusBar', () => {
         expect(screen.getByText(/5 findings/)).toBeInTheDocument();
     });
 
-    it('lint toggle button reflects enabled state and fires callback', async () => {
+    it('lint toggle shows the FUTURE state ("Lint off" when currently on) and fires callback', async () => {
+        // Toggle labels describe what clicking will DO, not the current
+        // state — so lintEnabled=true shows "Lint off" (button turns it off).
         const onToggleLint = vi.fn();
         const user = userEvent.setup();
         render(<StatusBar {...defaultProps} onToggleLint={onToggleLint} />);
-        const button = screen.getByRole('button', { name: /lint on/i });
+        const button = screen.getByRole('button', { name: /turn lint off/i });
+        expect(button.textContent).toContain('Lint off');
         await user.click(button);
         expect(onToggleLint).toHaveBeenCalled();
     });
 
-    it('shows "Lint off" label when lintEnabled is false', () => {
+    it('shows "Lint on" label when lintEnabled is false', () => {
+        // When linting is disabled, the button should invite enabling it.
         render(<StatusBar {...defaultProps} lintEnabled={false} />);
-        expect(screen.getByRole('button', { name: /lint off/i })).toBeInTheDocument();
+        const button = screen.getByRole('button', { name: /turn lint on/i });
+        expect(button.textContent).toContain('Lint on');
     });
 
     it('findings toggle fires callback and reflects state', async () => {

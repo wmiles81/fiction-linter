@@ -93,6 +93,24 @@ export function parseScanResponse(raw) {
         .filter(f => f.text && f.text.length > 0);
 }
 
+// Map AI categories to lint severities so users can distinguish critical
+// issues (show-vs-tell, emotional-telling — the prose-damaging ones) from
+// nice-to-have polish (generic language, over-explanation). The overlay's
+// wavy underline colors then communicate the tier without extra UI.
+//
+// Ranking rationale:
+//   error   — "this is actively hurting the prose": show-vs-tell + emotional-
+//             telling break immersion the most.
+//   warning — "noticeably weak": weak-phrasing + generic language.
+//   info    — "could be tighter": over-explanation, stylistic nits.
+export const AI_CATEGORY_SEVERITY = {
+    'show-vs-tell': 'error',
+    'emotional-telling': 'error',
+    'weak-phrasing': 'warning',
+    generic: 'warning',
+    'over-explanation': 'info'
+};
+
 /**
  * Translate chunk-scoped AI findings to document-scoped issues matching
  * the pattern-finding shape expected by the lint overlay.
@@ -111,12 +129,44 @@ export function toDocumentIssues(chunk, findings) {
             start: chunk.start + localIdx,
             end: chunk.start + localIdx + f.text.length,
             message: f.message || `AI flagged: ${f.category}`,
-            severity: 'info',
+            severity: AI_CATEGORY_SEVERITY[f.category] || 'info',
             category: f.category,
             source: 'ai'
         });
     }
     return issues;
+}
+
+// Ranking used by "Next finding" navigation and any severity-sorted views.
+// Lower number = more urgent.
+export const SEVERITY_RANK = {
+    error: 0,
+    warning: 1,
+    info: 2
+};
+
+/**
+ * Given a list of issues and the current cursor offset, return the NEXT
+ * issue to jump to. "Next" means: the most severe issue whose start is
+ * strictly after the cursor; ties broken by document position. Wraps to the
+ * beginning when no issues remain after the cursor, so repeated clicks
+ * cycle through the whole set.
+ */
+export function findNextIssue(issues, cursorOffset) {
+    if (!issues || issues.length === 0) return null;
+    const sortByRankThenPosition = (a, b) => {
+        const ra = SEVERITY_RANK[a.severity] ?? 99;
+        const rb = SEVERITY_RANK[b.severity] ?? 99;
+        if (ra !== rb) return ra - rb;
+        return a.start - b.start;
+    };
+    // First pick: the most severe issue after the cursor.
+    const after = issues.filter(i => i.start > cursorOffset);
+    if (after.length > 0) {
+        return [...after].sort(sortByRankThenPosition)[0];
+    }
+    // Wrap: most severe in the whole document.
+    return [...issues].sort(sortByRankThenPosition)[0];
 }
 
 /**
@@ -253,7 +303,13 @@ export async function scanDocument({ text, callAi, signal, onProgress, targetWor
             const chunkIssues = toDocumentIssues(chunk, findings);
             allIssues.push(...chunkIssues);
         }
-        onProgress?.({ current: i + 1, total: chunks.length, issues: allIssues });
+        // CRITICAL: pass a NEW array reference, not allIssues itself.
+        // Zustand and React both use Object.is for state comparisons —
+        // pushing to allIssues then passing the same reference would let
+        // every subscriber think nothing changed, so highlights would not
+        // refresh until some OTHER state change (e.g., toggling the linter)
+        // forced a merged-array recompute. Use a copy.
+        onProgress?.({ current: i + 1, total: chunks.length, issues: [...allIssues] });
     }
     return {
         ok: true,

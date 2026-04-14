@@ -161,6 +161,22 @@ function readSettings() {
     }
 }
 
+// Resolve the effective base URL for a chat-completion call.
+// Users who picked OpenRouter/OpenAI/etc. and left baseUrl blank should get
+// the provider's default endpoint rather than a hard "missing baseUrl" error.
+// Kept aligned with fetchOpenRouterModels / fetchOpenAIModels / fetchAnthropicModels
+// / fetchOllamaModels defaults in modelCatalog.js.
+const PROVIDER_DEFAULT_BASE_URLS = {
+    openrouter: 'https://openrouter.ai/api/v1',
+    openai: 'https://api.openai.com/v1',
+    anthropic: 'https://api.anthropic.com/v1',
+    ollama: 'http://localhost:11434'
+};
+function effectiveBaseUrl(aiSettings) {
+    if (aiSettings?.baseUrl) return aiSettings.baseUrl;
+    return PROVIDER_DEFAULT_BASE_URLS[aiSettings?.provider] || '';
+}
+
 function writeSettings(settings) {
     const settingsPath = path.join(app.getPath('userData'), SETTINGS_FILE);
     // Preserve lastRootPath across writes: the Settings dialog only knows
@@ -618,7 +634,7 @@ ipcMain.handle('ai:complete', async (_event, payload) => {
         : buildRewriteMessages({ finding, snippet });
 
     return callChatCompletion({
-        baseUrl: settings.ai.baseUrl,
+        baseUrl: effectiveBaseUrl(settings.ai),
         apiKey: settings.ai.apiKey,
         model: settings.ai.model,
         hyperparameters: settings.ai.hyperparameters,
@@ -639,7 +655,7 @@ ipcMain.handle('ai:scan', async (_event, payload) => {
     const settings = readSettings();
     const messages = buildScanMessages({ paragraph });
     return callChatCompletion({
-        baseUrl: settings.ai.baseUrl,
+        baseUrl: effectiveBaseUrl(settings.ai),
         apiKey: settings.ai.apiKey,
         model: settings.ai.model,
         hyperparameters: settings.ai.hyperparameters,

@@ -6,9 +6,10 @@
  */
 
 async function callChatCompletion({ baseUrl, apiKey, model, messages, hyperparameters }) {
-    if (!baseUrl || !apiKey) {
-        return { ok: false, error: 'Missing baseUrl or apiKey.' };
-    }
+    // Distinguish the two errors — they have different user remedies.
+    // "Set a base URL" vs "paste an API key in Settings → AI".
+    if (!baseUrl) return { ok: false, error: 'Missing baseUrl (no default configured for this provider).' };
+    if (!apiKey)  return { ok: false, error: 'Missing API key — open Settings → AI to paste one.' };
 
     const trimmedBase = baseUrl.replace(/\/+$/, '');
     const url = `${trimmedBase}/chat/completions`;

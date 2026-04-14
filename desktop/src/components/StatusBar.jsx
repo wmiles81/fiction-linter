@@ -18,7 +18,8 @@ function StatusBar({
     onToggleLint,
     onToggleFindings,
     scanProgress,
-    onToggleAiScan
+    onToggleAiScan,
+    onJumpNextFinding
 }) {
     const wordCount = useMemo(() => countWords(content), [content]);
     const charCount = content?.length ?? 0;
@@ -67,14 +68,21 @@ function StatusBar({
             </div>
 
             <div className="status-bar-right">
+                {/*
+                 * Toggle buttons show the FUTURE state — what happens when
+                 * you click — not the current state. This matches the
+                 * "button labels are verbs, not nouns" UX convention and
+                 * makes it obvious that clicking changes things rather
+                 * than reaffirms them.
+                 */}
                 <button
                     type="button"
                     className={`status-bar-toggle ${lintEnabled ? 'on' : 'off'}`}
                     onClick={onToggleLint}
-                    title={lintEnabled ? 'Click to disable linting' : 'Click to enable linting'}
-                    aria-label={lintEnabled ? 'Lint on' : 'Lint off'}
+                    title={lintEnabled ? 'Disable linting' : 'Enable linting'}
+                    aria-label={lintEnabled ? 'Click to turn lint off' : 'Click to turn lint on'}
                 >
-                    {lintEnabled ? 'Lint on' : 'Lint off'}
+                    {lintEnabled ? 'Lint off' : 'Lint on'}
                 </button>
 
                 <button
@@ -82,10 +90,10 @@ function StatusBar({
                     className={`status-bar-toggle ${showFindings ? 'on' : 'off'}`}
                     onClick={onToggleFindings}
                     disabled={!lintEnabled}
-                    title={showFindings ? 'Hide finding text' : 'Show finding text'}
-                    aria-label={`Findings ${showFindings ? 'visible' : 'hidden'}`}
+                    title={showFindings ? 'Hide findings' : 'Show findings'}
+                    aria-label={`Click to ${showFindings ? 'hide' : 'show'} findings`}
                 >
-                    {showFindings ? 'Findings' : 'Silent'}
+                    {showFindings ? 'Hide findings' : 'Show findings'}
                 </button>
 
                 <span className="status-bar-metric">{wordCount} words</span>
@@ -98,6 +106,16 @@ function StatusBar({
                 {cursorLine && cursorColumn ? (
                     <span className="status-bar-metric">Ln {cursorLine}:{cursorColumn}</span>
                 ) : null}
+                <button
+                    type="button"
+                    className="status-bar-toggle"
+                    onClick={onJumpNextFinding}
+                    disabled={!issueCount}
+                    title="Jump to the next finding (by severity, then position)"
+                    aria-label="Next finding"
+                >
+                    Next {'\u203A'}
+                </button>
                 <span className="status-bar-metric">{issueCount} findings</span>
             </div>
         </footer>

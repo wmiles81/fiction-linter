@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef } from 'react';
 import { PatternLinterCore, NameValidatorCore } from '@shared/linting';
-import { scanDocument } from './lib/aiScanner';
+import { scanDocument, findNextIssue } from './lib/aiScanner';
 import FileTree from './components/FileTree';
 import Editor from './components/editor/Editor';
 import { htmlToMarkdown } from './components/editor/converters';
@@ -437,6 +437,18 @@ function App() {
         setStatus(`Cannot open ${node.name}: unsupported file type.`);
     };
 
+    // "Next finding" jumps to the most severe finding after the cursor,
+    // wrapping to the top of the document when the cursor is past the last
+    // one. Uses the editor's current cursor offset (or 0 if nothing is
+    // selected) so the navigation follows wherever the writer last clicked.
+    const handleJumpNextFinding = () => {
+        if (!editorRef.current || visibleIssues.length === 0) return;
+        const cursor = editorRef.current.getCursorOffset?.() ?? -1;
+        const next = findNextIssue(visibleIssues, cursor);
+        if (!next) return;
+        editorRef.current.jumpTo(next);
+    };
+
     const handleSave = async () => {
         if (!activeTab?.path) return;
         const result = await window.api.writeFile(activeTab.path, activeTab.markdownSource);
@@ -651,6 +663,7 @@ function App() {
                 onToggleFindings={() => setShowFindings(!showFindings)}
                 scanProgress={scanProgress}
                 onToggleAiScan={handleToggleAiScan}
+                onJumpNextFinding={handleJumpNextFinding}
             />
 
             {showSettings && settings ? (

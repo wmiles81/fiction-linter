@@ -13,11 +13,16 @@ function pickNewActive(tabs, closingId, currentActiveId) {
     return null;
 }
 
-// Leading-edge debounce: coalesce bursts of mutations (e.g. per-keystroke
-// updateContent calls) into a single disk write 400ms after the latest
-// mutation. Each call cancels the previous pending timer and schedules a
-// fresh one reading from the latest state reference. Zustand state snapshots
-// are immutable, so the timeout always writes the most recent state.
+// Persistence strategy:
+//   - Structural changes (open, close, switch active) → IMMEDIATE write, no
+//     debounce. Quick Cmd+Q after opening a tab should still restore that
+//     tab on next launch.
+//   - Content edits (per-keystroke updateContent) → debounced 400ms, because
+//     a write per keystroke is wasteful and noisy.
+//   - window beforeunload → flush any pending debounced write.
+//
+// Each mutation action in the store decides which path to use by passing
+// `{ immediate: true }` to the internal schedulePersist helper.
 let _persistTimeout = null;
 function buildPersistPayload(state) {
     return {
@@ -31,13 +36,24 @@ function buildPersistPayload(state) {
         activeTabId: state.activeTabId
     };
 }
-function persistNow(state) {
+function writeToDisk(state) {
     if (typeof window === 'undefined' || !window.api?.saveTabs) return;
-    if (_persistTimeout) clearTimeout(_persistTimeout);
+    const payload = buildPersistPayload(state);
+    window.api.saveTabs(payload).catch(() => { /* best effort */ });
+}
+function persistNow(state, { immediate = false } = {}) {
+    if (typeof window === 'undefined' || !window.api?.saveTabs) return;
+    if (_persistTimeout) {
+        clearTimeout(_persistTimeout);
+        _persistTimeout = null;
+    }
+    if (immediate) {
+        writeToDisk(state);
+        return;
+    }
     _persistTimeout = setTimeout(() => {
         _persistTimeout = null;
-        const payload = buildPersistPayload(state);
-        window.api.saveTabs(payload).catch(() => { /* best effort */ });
+        writeToDisk(state);
     }, 400);
 }
 // Synchronous flush: cancels any pending debounce and writes the latest
@@ -61,12 +77,13 @@ function flushPersist() {
 }
 
 // Zustand middleware: wraps `set` so every mutation writes to userData/tabs.json.
-// The raw `set` from Zustand is replaced with a wrapper that calls persistNow
-// with the post-mutation state — obtained via `get()` which always reads live.
+// Actions can pass a third argument `{ immediate: true }` to skip the
+// 400ms debounce — used for structural changes (open, close, switch active
+// tab) where a quick quit should still persist the change.
 const withPersist = (config) => (set, get, api) => {
-    const wrappedSet = (partial, replace) => {
+    const wrappedSet = (partial, replace, persistOpts) => {
         set(partial, replace);
-        persistNow(get());
+        persistNow(get(), persistOpts);
     };
     return config(wrappedSet, get, api);
 };
@@ -88,7 +105,7 @@ export const useEditorStore = create(withPersist((set, get) => ({
                         : t
                 ),
                 activeTabId: existing.id
-            }));
+            }), false, { immediate: true });
             return existing.id;
         }
         const newTab = {
@@ -101,7 +118,7 @@ export const useEditorStore = create(withPersist((set, get) => ({
         set(state => ({
             tabs: [...state.tabs, newTab],
             activeTabId: newTab.id
-        }));
+        }), false, { immediate: true });
         return newTab.id;
     },
 
@@ -117,11 +134,11 @@ export const useEditorStore = create(withPersist((set, get) => ({
         set(state => ({
             tabs: [...state.tabs, newTab],
             activeTabId: newTab.id
-        }));
+        }), false, { immediate: true });
         return newTab.id;
     },
 
-    setActiveTab: (id) => set({ activeTabId: id }),
+    setActiveTab: (id) => set({ activeTabId: id }, false, { immediate: true }),
 
     updateContent: (markdownSource) => {
         const activeId = get().activeTabId;
@@ -156,10 +173,10 @@ export const useEditorStore = create(withPersist((set, get) => ({
         const { tabs, activeTabId } = get();
         const newActive = pickNewActive(tabs, id, activeTabId);
         const newTabs = tabs.filter(t => t.id !== id);
-        set({ tabs: newTabs, activeTabId: newActive });
+        set({ tabs: newTabs, activeTabId: newActive }, false, { immediate: true });
     },
 
-    closeAllTabs: () => set({ tabs: [], activeTabId: null }),
+    closeAllTabs: () => set({ tabs: [], activeTabId: null }, false, { immediate: true }),
 
     getActiveTab: () => {
         const { tabs, activeTabId } = get();

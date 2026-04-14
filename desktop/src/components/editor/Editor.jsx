@@ -276,6 +276,22 @@ const Editor = forwardRef(function Editor({
         getPlainText() {
             if (!editorRef.current) return '';
             return buildOffsetMap(editorRef.current).text;
+        },
+        // Current caret position as an offset into the plain-text
+        // representation the linter uses. Returns null when nothing in the
+        // editor is selected (e.g., user just focused elsewhere). Used by
+        // "Next finding" so it can jump to the next issue AFTER the cursor
+        // instead of always restarting from the top.
+        getCursorOffset() {
+            if (!editorRef.current) return null;
+            const sel = document.getSelection();
+            if (!sel || sel.rangeCount === 0) return null;
+            const range = sel.getRangeAt(0);
+            if (!editorRef.current.contains(range.startContainer)) return null;
+            const { map } = buildOffsetMap(editorRef.current);
+            const entry = map.find(e => e.node === range.startContainer);
+            if (!entry) return null;
+            return entry.startInText + range.startOffset;
         }
     }));
 
