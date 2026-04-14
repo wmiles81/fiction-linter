@@ -446,7 +446,7 @@ const Editor = forwardRef(function Editor({
                                 <span
                                     key={n}
                                     className="editor-lineno"
-                                    style={{ top: `${top + 20}px` }}
+                                    style={{ top: `${top}px` }}
                                 >
                                     {n}
                                 </span>

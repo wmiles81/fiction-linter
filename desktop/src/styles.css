@@ -1180,6 +1180,13 @@ body {
     outline: none;
     background: var(--g-bg, #ffffff);
     color: var(--g-text, #2a2620);
+    /*
+     * Make the surface its own offset parent so each child paragraph's
+     * offsetTop is measured from THIS element, not from some ancestor
+     * higher in the tree. The line-number gutter relies on those offsets
+     * landing in the surface's coordinate system.
+     */
+    position: relative;
 }
 
 .editor-surface.wrap {
@@ -1242,6 +1249,15 @@ body {
     font-size: 11px;
     font-weight: 500;
     font-variant-numeric: tabular-nums;
+    /*
+     * Match the editor paragraph line box (16px font × 1.2 line-height =
+     * 19.2px) so the 11px number text sits in a box the same height as a
+     * paragraph's first text line. With both spans placed at the same
+     * `top`, matching line-heights means both text baselines fall on the
+     * same horizontal axis — no visual "gutter is 3px above the text"
+     * drift.
+     */
+    line-height: 19.2px;
 }
 
 .editor-surface.with-line-numbers {
