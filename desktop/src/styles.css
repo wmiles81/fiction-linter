@@ -1195,65 +1195,58 @@ body {
 /*
  * Line numbers gutter — toggled via the status bar.
  *
- * Uses CSS counters on BLOCK elements (p, div, h1-6, blockquote, pre, li).
- * This numbers each rendered paragraph rather than each plain-text newline —
- * for fiction prose the two usually match up, and block-based numbering is
- * what users intuit ("paragraph 3 = line 3"). The gutter sits in the left
- * padding so the main text flow is undisturbed.
+ * Implemented as a real sibling DOM element, not CSS counters, because
+ * Chromium suppresses ::before pseudo-elements on direct children of a
+ * contenteditable in some cases. The gutter is populated by JS that
+ * observes the editor DOM and measures each block's offsetTop, then
+ * renders one absolute-positioned number per block at the matching top.
  *
- * Numbers are intentionally muted (50% opacity) so they don't compete with
- * the prose; they're a wayfinding aid, not the star of the show.
+ * Scroll-sync: onScroll on the surface transforms the gutter's inner
+ * container by the negative scrollTop so numbers scroll with prose.
  */
-.editor-surface.with-line-numbers {
-    counter-reset: editor-lineno;
-    padding-left: 64px;
-}
-
-.editor-surface.with-line-numbers > p,
-.editor-surface.with-line-numbers > div,
-.editor-surface.with-line-numbers > h1,
-.editor-surface.with-line-numbers > h2,
-.editor-surface.with-line-numbers > h3,
-.editor-surface.with-line-numbers > h4,
-.editor-surface.with-line-numbers > h5,
-.editor-surface.with-line-numbers > h6,
-.editor-surface.with-line-numbers > blockquote,
-.editor-surface.with-line-numbers > pre,
-.editor-surface.with-line-numbers > ul,
-.editor-surface.with-line-numbers > ol {
-    counter-increment: editor-lineno;
+.editor-body {
     position: relative;
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    overflow: hidden;
 }
 
-.editor-surface.with-line-numbers > p::before,
-.editor-surface.with-line-numbers > div::before,
-.editor-surface.with-line-numbers > h1::before,
-.editor-surface.with-line-numbers > h2::before,
-.editor-surface.with-line-numbers > h3::before,
-.editor-surface.with-line-numbers > h4::before,
-.editor-surface.with-line-numbers > h5::before,
-.editor-surface.with-line-numbers > h6::before,
-.editor-surface.with-line-numbers > blockquote::before,
-.editor-surface.with-line-numbers > pre::before,
-.editor-surface.with-line-numbers > ul::before,
-.editor-surface.with-line-numbers > ol::before {
-    content: counter(editor-lineno);
+.editor-gutter {
+    flex-shrink: 0;
+    width: 44px;
+    background: var(--g-panel-bg, #faf8f4);
+    border-right: 1px solid var(--g-border, #d7d2c5);
+    overflow: hidden;
+    position: relative;
+    user-select: none;
+    pointer-events: none;
+}
+
+.editor-gutter-inner {
     position: absolute;
-    left: -44px;
+    top: 0;
+    left: 0;
+    right: 0;
+    /* Translated via JS to match editor-surface scrollTop. */
+}
+
+.editor-lineno {
+    position: absolute;
+    right: 8px;
     width: 32px;
     text-align: right;
     color: var(--g-text-muted, #6b655b);
-    opacity: 0.5;
+    opacity: 0.6;
     font-family: 'SF Mono', 'Menlo', 'Monaco', monospace;
     font-size: 11px;
     font-weight: 500;
     font-variant-numeric: tabular-nums;
-    top: 0.4em;
-    /* Don't interfere with the contenteditable selection or copy behavior —
-       ::before is a pseudo-element, already non-selectable by default,
-       but making it explicit is defensive. */
-    user-select: none;
-    pointer-events: none;
+}
+
+.editor-surface.with-line-numbers {
+    /* Inner editor padding already provides prose breathing room; the
+       gutter handles the number column, so no extra padding needed. */
 }
 
 /* Inline lint warning tooltip — appears on hover over a highlighted finding.

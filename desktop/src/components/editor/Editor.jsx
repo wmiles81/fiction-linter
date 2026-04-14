@@ -40,7 +40,11 @@ const Editor = forwardRef(function Editor({
     showLineNumbers
 }, ref) {
     const editorRef = useRef(null);
+    const gutterInnerRef = useRef(null);
     const isSettingContentRef = useRef(false);
+    // Line-number positions: one entry per block child of the editor
+    // surface, recomputed on content change via a MutationObserver below.
+    const [lineNumberPositions, setLineNumberPositions] = useState([]);
     // Track the last markdown we emitted so we can ignore the re-entry
     // that happens when the parent echoes value back.
     const lastEmittedRef = useRef(null);
@@ -278,6 +282,61 @@ const Editor = forwardRef(function Editor({
         return cleanup;
     }, [issues, showFindings]);
 
+    // Line-number gutter maintenance. A MutationObserver watches the
+    // contenteditable for any structural change (including innerHTML
+    // resets and keystrokes), then we walk its block children and record
+    // each one's offsetTop so the gutter can place numbers at the
+    // matching vertical positions. No-op when showLineNumbers is false.
+    useEffect(() => {
+        if (!showLineNumbers) {
+            setLineNumberPositions([]);
+            return;
+        }
+        if (!editorRef.current) return;
+        const recompute = () => {
+            const surface = editorRef.current;
+            if (!surface) return;
+            const positions = [];
+            let n = 0;
+            for (const child of surface.children) {
+                // Skip non-block elements that might slip in (e.g. a stray
+                // inline <br> with no tag surrounding it shouldn't count
+                // as a line). Real block tags include p, headings, etc.
+                if (child.nodeType !== 1) continue;
+                n += 1;
+                positions.push({ n, top: child.offsetTop });
+            }
+            setLineNumberPositions(positions);
+        };
+        // Run once after current render, then observe.
+        const raf = requestAnimationFrame(recompute);
+        const observer = new MutationObserver(() => {
+            // Coalesce bursts (typing) into one animation-frame recompute.
+            requestAnimationFrame(recompute);
+        });
+        observer.observe(editorRef.current, {
+            childList: true,
+            subtree: true,
+            characterData: true
+        });
+        // Also recompute on window resize (wrapped text changes heights).
+        window.addEventListener('resize', recompute);
+        return () => {
+            cancelAnimationFrame(raf);
+            observer.disconnect();
+            window.removeEventListener('resize', recompute);
+        };
+    }, [showLineNumbers, value]);
+
+    // Scroll-sync: translate the gutter's inner container by the editor's
+    // negative scrollTop so numbers stay aligned with their blocks as the
+    // user scrolls.
+    const handleSurfaceScroll = useCallback(() => {
+        if (!gutterInnerRef.current || !editorRef.current) return;
+        const y = editorRef.current.scrollTop;
+        gutterInnerRef.current.style.transform = `translateY(${-y}px)`;
+    }, []);
+
     // Toolbar command dispatch
     const handleToolbarCommand = useCallback(({ kind, value: cmdValue }) => {
         if (!editorRef.current) return;
@@ -379,17 +438,35 @@ const Editor = forwardRef(function Editor({
                 canRedo={true}
                 canSave={true}
             />
-            <div
-                ref={editorRef}
-                className={`editor-surface ${wrap ? 'wrap' : ''} ${showLineNumbers ? 'with-line-numbers' : ''}`}
-                contentEditable
-                suppressContentEditableWarning
-                onInput={handleInput}
-                onPaste={handlePaste}
-                onMouseMove={handleMouseMove}
-                onMouseLeave={handleMouseLeave}
-                spellCheck={false}
-            />
+            <div className="editor-body">
+                {showLineNumbers ? (
+                    <div className="editor-gutter" aria-hidden="true">
+                        <div className="editor-gutter-inner" ref={gutterInnerRef}>
+                            {lineNumberPositions.map(({ n, top }) => (
+                                <span
+                                    key={n}
+                                    className="editor-lineno"
+                                    style={{ top: `${top + 20}px` }}
+                                >
+                                    {n}
+                                </span>
+                            ))}
+                        </div>
+                    </div>
+                ) : null}
+                <div
+                    ref={editorRef}
+                    className={`editor-surface ${wrap ? 'wrap' : ''} ${showLineNumbers ? 'with-line-numbers' : ''}`}
+                    contentEditable
+                    suppressContentEditableWarning
+                    onInput={handleInput}
+                    onPaste={handlePaste}
+                    onMouseMove={handleMouseMove}
+                    onMouseLeave={handleMouseLeave}
+                    onScroll={handleSurfaceScroll}
+                    spellCheck={false}
+                />
+            </div>
             {hoverFinding ? (
                 <div
                     className={`lint-tooltip ${hoverFinding.severity || 'info'}`}
