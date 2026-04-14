@@ -685,7 +685,7 @@ ipcMain.handle('spe:load', async (_event, spePath) => {
 });
 
 ipcMain.handle('ai:complete', async (_event, payload) => {
-    const { kind, finding, snippet } = payload || {};
+    const { kind, finding, snippet, flagged } = payload || {};
     if (kind !== 'explain' && kind !== 'rewrite') {
         return { ok: false, error: `Unknown kind: ${kind}` };
     }
@@ -698,7 +698,7 @@ ipcMain.handle('ai:complete', async (_event, payload) => {
     const settings = readSettings();
     const messages = kind === 'explain'
         ? buildExplainMessages({ finding, snippet })
-        : buildRewriteMessages({ finding, snippet });
+        : buildRewriteMessages({ finding, snippet, flagged });
 
     return callChatCompletion({
         baseUrl: effectiveBaseUrl(settings.ai),

@@ -11,10 +11,16 @@ const SYSTEM_EXPLAIN =
     'Do not suggest rewrites. Do not moralize. Do not pad the response with preamble.';
 
 const SYSTEM_REWRITE =
-    'You are a line editor for literary fiction. A linting tool has flagged a phrase in a sentence. ' +
-    'Return exactly three alternative rewrites of the sentence, each on its own line, ' +
-    'prefixed with "1.", "2.", "3.". Preserve the author\'s meaning and voice. ' +
-    'Do not add commentary, preamble, or explanations.';
+    'You are a line editor for literary fiction. A specific phrase has been flagged for a ' +
+    'stylistic issue. Return exactly THREE alternative phrases that could be dropped in ' +
+    'place of the flagged phrase itself.\n\n' +
+    'Rules:\n' +
+    '- Each alternative replaces ONLY the flagged phrase, not the surrounding sentence.\n' +
+    '- Preserve the original syntactic role so the replacement reads naturally inline.\n' +
+    '- Preserve the author\'s meaning and voice.\n' +
+    '- Format: three lines prefixed "1.", "2.", "3." — just the replacement phrase per line.\n' +
+    '- Do not repeat the surrounding context. Do not add commentary, preamble, or explanations.\n' +
+    '- Do not wrap lines in quotes or markdown fences.';
 
 // The scan prompt asks the model to find issues the deterministic pattern
 // linter cannot — things that need comprehension, not pattern matching.
@@ -52,18 +58,21 @@ function buildExplainMessages({ finding, snippet }) {
     ];
 }
 
-function buildRewriteMessages({ finding, snippet }) {
+function buildRewriteMessages({ finding, snippet, flagged }) {
+    // `flagged` is the exact substring the linter flagged — the phrase
+    // the user wants replaced. `snippet` is the wider context (roughly a
+    // sentence or two) the model can consult but must NOT rewrite.
+    const lines = [];
+    if (flagged) {
+        lines.push(`Flagged phrase: "${flagged}"`);
+    }
+    lines.push(`Issue: ${finding.message}`);
+    lines.push('');
+    lines.push('Context (do NOT rewrite this — only the flagged phrase):');
+    lines.push(snippet);
     return [
         { role: 'system', content: SYSTEM_REWRITE },
-        {
-            role: 'user',
-            content: [
-                `Flagged: ${finding.message}`,
-                '',
-                'Original sentence:',
-                snippet
-            ].join('\n')
-        }
+        { role: 'user', content: lines.join('\n') }
     ];
 }
 

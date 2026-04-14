@@ -501,7 +501,8 @@ function App() {
         const result = await window.api.aiComplete({
             kind: 'rewrite',
             finding: { message: finding.message, severity: finding.severity },
-            snippet
+            snippet,
+            flagged: original
         });
         if (!result?.ok) {
             setStatus(`Fix now failed: ${result?.error || 'unknown error'}`);
@@ -514,13 +515,29 @@ function App() {
                 `AI returned no parseable rewrite. Raw response:\n\n${result.content}`));
             return;
         }
-        // The rewrite typically rewrites the whole sentence, not the exact
-        // flagged substring. Apply it AS the replacement for the flagged
-        // range — the user can edit further if the scope is off.
+        // Apply the replacement: drop-in substitute the flagged phrase
+        // with the AI's first alternative. The rewrite prompt now asks for
+        // phrase-level alternatives, so this is just the replacement text.
         const before = plain.slice(0, finding.start);
         const after = plain.slice(finding.end);
         const newMarkdown = before + firstAlt + after;
         updateContent(newMarkdown);
+
+        // Clear the fixed finding from the overlay so the user has visible
+        // confirmation that work was done — otherwise the squiggle stays
+        // on stale offsets and looks like nothing happened. AI findings
+        // after the replacement point need their offsets shifted by the
+        // length delta so they still highlight the right text.
+        const delta = firstAlt.length - original.length;
+        const nextAiIssues = aiIssues
+            .filter(i => !(i.start === finding.start && i.end === finding.end && i.source === finding.source))
+            .map(i => (i.start > finding.start)
+                ? { ...i, start: i.start + delta, end: i.end + delta }
+                : i);
+        setAiIssues(nextAiIssues);
+        // Pattern findings regenerate automatically on the next 300ms lint
+        // pass triggered by updateContent, so no explicit cleanup there.
+
         await window.api.appendAnnotation(activeTab.path, buildFindingEntry(finding,
             `Replaced "${original}" with "${firstAlt}" via Fix now.`));
         setStatus(`Fix applied and logged. ${activeTab.path}.annotation.md`);
@@ -797,17 +814,46 @@ function indexToLineCol(text, index) {
     return { line, column };
 }
 
-// The rewrite prompt asks the model to return three alternatives prefixed
-// "1.", "2.", "3.". Extract the FIRST alternative's text for a Fix-now
-// apply. Defensive against leading whitespace, markdown fences, and
-// variations in the prefix ("1)", "1:"), but returns null when no numbered
-// line is found — the caller surfaces that and logs the raw response.
+// Extract the FIRST of three alternative rewrites returned by the AI.
+//
+// The prompt asks for "1. foo\n2. bar\n3. baz" format, and most models
+// honor it. Some — particularly smaller free models — return unnumbered
+// alternatives separated by blank lines, or numbered with subtle format
+// variations. Try strategies in order of specificity:
+//
+//   1. Numbered list: "1. foo\n2. bar\n..." with 1., 1), or 1: prefix
+//   2. Unnumbered paragraphs: split on blank lines, take the first
+//      non-empty line/paragraph that looks like a plausible replacement
+//      (not just a preamble sentence)
+//
+// Returns null if nothing usable is found — caller logs the raw response
+// so the user can manually extract an alternative.
 export function extractFirstRewrite(raw) {
     if (!raw || typeof raw !== 'string') return null;
     const cleaned = raw.replace(/^```[a-z]*\s*/i, '').replace(/\s*```\s*$/i, '').trim();
-    const match = cleaned.match(/^\s*1[.):]\s*(.+?)(?=\n\s*2[.):]|\n{2,}|$)/s);
-    if (!match) return null;
-    return match[1].trim().replace(/^["'"]+|["'"]+$/g, '');
+    if (!cleaned) return null;
+
+    // Strategy 1: numbered list.
+    const numbered = cleaned.match(/^\s*1[.):]\s*(.+?)(?=\n\s*2[.):]|\n{2,}|$)/s);
+    if (numbered) {
+        return numbered[1].trim().replace(/^["'"]+|["'"]+$/g, '');
+    }
+
+    // Strategy 2: unnumbered paragraphs. Split on blank lines, filter out
+    // empties and obvious preamble ("Here are three alternatives:"), take
+    // the first remaining block. Preamble detection is a heuristic: a
+    // sentence ending in ":" that contains the word "alternative" or
+    // "rewrite" is almost certainly a preamble line.
+    const blocks = cleaned
+        .split(/\n{2,}/)
+        .map(b => b.trim())
+        .filter(Boolean)
+        .filter(b => !/^.{0,60}(alternatives?|rewrites?|options?|suggestions?)\s*:\s*$/i.test(b));
+    if (blocks.length > 0) {
+        return blocks[0].replace(/^["'"]+|["'"]+$/g, '');
+    }
+
+    return null;
 }
 
 export default App;

@@ -22,8 +22,7 @@ describe('extractFirstRewrite', () => {
         expect(extractFirstRewrite('1: Alpha.\n2: Beta.')).toBe('Alpha.');
     });
 
-    it('returns null when no numbered line is found', () => {
-        expect(extractFirstRewrite('The AI just wrote prose instead.')).toBe(null);
+    it('returns null for empty / non-string input', () => {
         expect(extractFirstRewrite('')).toBe(null);
         expect(extractFirstRewrite(null)).toBe(null);
     });
@@ -31,5 +30,37 @@ describe('extractFirstRewrite', () => {
     it('strips surrounding quotes if the model wrapped the rewrite', () => {
         const raw = '1. "A quoted rewrite."\n2. Second.';
         expect(extractFirstRewrite(raw)).toBe('A quoted rewrite.');
+    });
+
+    it('falls back to the first paragraph when no numbering is present', () => {
+        // Real regression: a free model returned three rewrites as
+        // paragraphs separated by blank lines, no "1." prefix. Parser
+        // used to give up entirely — now it picks the first paragraph.
+        const raw = [
+            'warmth coils low in my belly',
+            '',
+            'a slow heat settles low in my belly',
+            '',
+            'something tightens, low and warm, in my belly'
+        ].join('\n');
+        expect(extractFirstRewrite(raw)).toBe('warmth coils low in my belly');
+    });
+
+    it('skips a preamble line ("Here are three alternatives:") before paragraphs', () => {
+        const raw = [
+            'Here are three alternatives:',
+            '',
+            'warmth coils low in her belly',
+            '',
+            'a slow heat settles in'
+        ].join('\n');
+        expect(extractFirstRewrite(raw)).toBe('warmth coils low in her belly');
+    });
+
+    it('prefers numbered parsing over paragraph fallback when both could apply', () => {
+        // Model returned numbered alternatives but also separated them
+        // with blank lines. Numbered strategy should win.
+        const raw = '1. First answer.\n\n2. Second answer.\n\n3. Third answer.';
+        expect(extractFirstRewrite(raw)).toBe('First answer.');
     });
 });
