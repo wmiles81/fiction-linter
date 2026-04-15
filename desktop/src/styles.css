@@ -431,20 +431,37 @@ body {
 }
 
 .icon-button {
-    width: 40px;
-    height: 40px;
-    border-radius: 12px;
-    background: var(--surface-strong);
-    border: 1px solid var(--border);
+    width: 32px;
+    height: 32px;
+    border: none;
+    background: transparent;
+    box-shadow: none;
     display: grid;
     place-items: center;
-    box-shadow: var(--shadow);
+    /* No chrome — the button blends with the surrounding top-bar
+       gradient. Only the icon itself carries the visual weight. The
+       hover state gets a light color shift instead of a background
+       so the feel stays minimal. */
+    transition: opacity 120ms ease, transform 120ms ease;
+    opacity: 0.75;
+}
+
+.icon-button:hover {
+    opacity: 1;
+}
+
+.icon-button:active {
+    transform: scale(0.95);
 }
 
 .icon-button svg {
     width: 20px;
     height: 20px;
-    color: var(--accent-2);
+    /* stroke is used by the Lucide-style gear (stroke="currentColor");
+       color carries through to both stroke and any fill="currentColor"
+       children. Bound to --ink so the icon tracks theme automatically:
+       dark on Parchment/Sepia/High-Contrast, light on Midnight. */
+    color: var(--ink, #1c1b19);
 }
 
 .workspace {
