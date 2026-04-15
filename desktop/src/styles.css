@@ -153,7 +153,95 @@ body {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 20px 28px 12px;
+    /* Lower the top padding a touch now that the bar also carries the
+       toolbar — gives the action buttons vertical room without pushing
+       the workspace further down the screen. */
+    padding: 14px 28px 12px;
+    gap: 20px;
+    flex-wrap: wrap;
+}
+
+/*
+ * Main toolbar in the top bar. Three .toolbar-group clusters sit in a
+ * single row with a slightly larger gap between groups than within a
+ * group, so the eye parses it as three "sentences" rather than nine
+ * buttons in a line.
+ */
+.toolbar {
+    display: flex;
+    flex: 1;
+    justify-content: center;
+    align-items: center;
+    gap: 18px;
+    flex-wrap: wrap;
+}
+
+.toolbar-group {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.toolbar-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: var(--surface-strong, #ffffff);
+    border: 1px solid var(--border, #d3d5da);
+    color: var(--ink, #1c1b19);
+    padding: 5px 10px;
+    border-radius: 5px;
+    font-size: 12px;
+    font-weight: 500;
+    font-family: inherit;
+    cursor: pointer;
+    transition: border-color 120ms ease, background 120ms ease;
+}
+
+.toolbar-btn:hover:not(:disabled) {
+    border-color: var(--accent, #d05b41);
+}
+
+.toolbar-btn.on {
+    background: var(--g-accent-bg, #e8f0e8);
+    border-color: var(--g-accent, #4a7a4a);
+    color: var(--g-accent, #4a7a4a);
+}
+
+.toolbar-btn.off {
+    color: var(--g-text-muted, #6b655b);
+}
+
+.toolbar-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+/* Action buttons (AI Scan, Re-lint) — slight emphasis so they don't get
+   lost among the toggles. */
+.toolbar-btn-action {
+    color: var(--g-accent, #4a7a4a);
+    font-weight: 600;
+}
+
+.toolbar-btn-action:hover:not(:disabled) {
+    background: var(--g-accent-bg, #e8f0e8);
+    border-color: var(--g-accent, #4a7a4a);
+}
+
+.toolbar-btn-action.running {
+    background: var(--g-accent-bg, #e8f0e8);
+    border-color: var(--g-accent, #4a7a4a);
+}
+
+.toolbar-btn-action.running .toolbar-btn-icon {
+    display: inline-block;
+    animation: fl-spin 1s linear infinite;
+}
+
+.toolbar-btn-icon {
+    font-size: 13px;
+    line-height: 1;
 }
 
 .brand-title {
@@ -606,67 +694,9 @@ body {
     font-variant-numeric: tabular-nums;
 }
 
-.status-bar-toggle {
-    background: transparent;
-    border: 1px solid var(--g-border, #d7d2c5);
-    color: var(--g-text, #2a2620);
-    padding: 2px 8px;
-    border-radius: 3px;
-    font-size: 11px;
-    cursor: pointer;
-    font-weight: 500;
-}
-
-.status-bar-toggle:hover:not(:disabled) {
-    background: rgba(0, 0, 0, 0.04);
-}
-
-.status-bar-toggle.off {
-    color: var(--g-text-muted, #6b655b);
-    background: transparent;
-}
-
-.status-bar-toggle.on {
-    background: var(--g-accent-bg, #e8f0e8);
-    border-color: var(--g-accent, #4a7a4a);
-    color: var(--g-accent, #4a7a4a);
-}
-
-.status-bar-toggle:disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
-}
-
-.status-bar-scan {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    background: transparent;
-    border: 1px solid var(--g-border, #d7d2c5);
-    color: var(--g-accent, #4a7a4a);
-    padding: 2px 8px;
-    border-radius: 3px;
-    font-size: 11px;
-    font-weight: 600;
-    cursor: pointer;
-    font-family: inherit;
-}
-
-.status-bar-scan:hover {
-    background: var(--g-accent-bg, #e8f0e8);
-    border-color: var(--g-accent, #4a7a4a);
-}
-
-.status-bar-scan.running {
-    background: var(--g-accent-bg, #e8f0e8);
-    border-color: var(--g-accent, #4a7a4a);
-}
-
-.status-bar-scan.running .status-bar-scan-icon {
-    display: inline-block;
-    animation: fl-spin 1s linear infinite;
-}
-
+/* fl-spin is used by the .toolbar-btn-action.running button (AI Scan
+   while running). Kept here because it's a reusable animation, not a
+   status-bar-specific one. */
 @keyframes fl-spin {
     from { transform: rotate(0deg); }
     to   { transform: rotate(360deg); }

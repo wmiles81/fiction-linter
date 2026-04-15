@@ -789,6 +789,86 @@ function App() {
                     <span className="brand-title">Fiction Linter</span>
                     <span className="brand-tag">Desktop Studio</span>
                 </div>
+
+                {/*
+                 * Main toolbar — three visually-grouped clusters:
+                 *   1. Scan actions (AI Scan, Re-lint)
+                 *   2. View toggles (Lint, Findings, Line #s)
+                 *   3. Navigation (Next finding)
+                 * Labels show the FUTURE state for toggles — same
+                 * convention we established in the status bar.
+                 */}
+                <div className="toolbar">
+                    <div className="toolbar-group">
+                        <button
+                            type="button"
+                            className={`toolbar-btn toolbar-btn-action ${scanProgress ? 'running' : ''}`}
+                            onClick={handleToggleAiScan}
+                            title={scanProgress
+                                ? `Scanning paragraph ${scanProgress.current} of ${scanProgress.total} — click to cancel`
+                                : 'Run AI scan on the current document'}
+                        >
+                            <span className="toolbar-btn-icon" aria-hidden="true">
+                                {scanProgress ? '\u21bb' : '\u2728'}
+                            </span>
+                            <span>
+                                {scanProgress && scanProgress.total > 0
+                                    ? `AI Scan: ${Math.round((scanProgress.current / scanProgress.total) * 100)}%`
+                                    : 'AI Scan'}
+                            </span>
+                        </button>
+                        <button
+                            type="button"
+                            className="toolbar-btn toolbar-btn-action"
+                            onClick={handleRelint}
+                            title="Reload SPE rules and re-run the deterministic lint over the current document"
+                        >
+                            <span className="toolbar-btn-icon" aria-hidden="true">{'\u21bb'}</span>
+                            <span>Re-lint</span>
+                        </button>
+                    </div>
+
+                    <div className="toolbar-group">
+                        <button
+                            type="button"
+                            className={`toolbar-btn ${lintEnabled ? 'on' : 'off'}`}
+                            onClick={() => setLintEnabled(!lintEnabled)}
+                            title={lintEnabled ? 'Disable linting' : 'Enable linting'}
+                        >
+                            {lintEnabled ? 'Lint off' : 'Lint on'}
+                        </button>
+                        <button
+                            type="button"
+                            className={`toolbar-btn ${showFindings ? 'on' : 'off'}`}
+                            onClick={() => setShowFindings(!showFindings)}
+                            disabled={!lintEnabled}
+                            title={showFindings ? 'Hide findings' : 'Show findings'}
+                        >
+                            {showFindings ? 'Hide findings' : 'Show findings'}
+                        </button>
+                        <button
+                            type="button"
+                            className={`toolbar-btn ${showLineNumbers ? 'on' : 'off'}`}
+                            onClick={() => setShowLineNumbers(!showLineNumbers)}
+                            title={showLineNumbers ? 'Hide line numbers' : 'Show line numbers'}
+                        >
+                            {showLineNumbers ? 'No #s' : 'Line #s'}
+                        </button>
+                    </div>
+
+                    <div className="toolbar-group">
+                        <button
+                            type="button"
+                            className="toolbar-btn"
+                            onClick={handleJumpNextFinding}
+                            disabled={!visibleIssues.length}
+                            title="Jump to the next finding (by severity, then position)"
+                        >
+                            Next {'\u203A'}
+                        </button>
+                    </div>
+                </div>
+
                 <div className="top-actions">
                     <ThemePicker />
                     <button
@@ -797,11 +877,24 @@ function App() {
                         aria-label="Open settings"
                         title="Settings"
                     >
-                        <svg viewBox="0 0 24 24" aria-hidden="true">
-                            <path
-                                d="M12 8.7a3.3 3.3 0 1 0 0 6.6 3.3 3.3 0 0 0 0-6.6Zm8.7 3.3c0-.5-.1-1-.2-1.4l2-1.6-2-3.5-2.4 1a7.3 7.3 0 0 0-2.4-1.4L12.9 2H11l-.8 2.9a7.3 7.3 0 0 0-2.4 1.4l-2.4-1-2 3.5 2 1.6c-.1.4-.2.9-.2 1.4s.1 1 .2 1.4l-2 1.6 2 3.5 2.4-1a7.3 7.3 0 0 0 2.4 1.4l.8 2.9h1.9l.8-2.9a7.3 7.3 0 0 0 2.4-1.4l2.4 1 2-3.5-2-1.6c.1-.4.2-.9.2-1.4Z"
-                                fill="currentColor"
-                            />
+                        {/*
+                         * Lucide-style settings gear — the canonical
+                         * 8-tooth outline cog that matches what users
+                         * see in virtually every modern app (Slack,
+                         * GitHub, VS Code, macOS System Settings all
+                         * use this same profile).
+                         */}
+                        <svg
+                            viewBox="0 0 24 24"
+                            aria-hidden="true"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                        >
+                            <circle cx="12" cy="12" r="3" />
+                            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
                         </svg>
                     </button>
                 </div>
@@ -870,16 +963,6 @@ function App() {
                 selection={editorState.selection}
                 dirty={dirty}
                 issueCount={visibleIssues.length}
-                lintEnabled={lintEnabled}
-                showFindings={showFindings}
-                onToggleLint={() => setLintEnabled(!lintEnabled)}
-                onToggleFindings={() => setShowFindings(!showFindings)}
-                scanProgress={scanProgress}
-                onToggleAiScan={handleToggleAiScan}
-                onJumpNextFinding={handleJumpNextFinding}
-                onRelint={handleRelint}
-                showLineNumbers={showLineNumbers}
-                onToggleLineNumbers={() => setShowLineNumbers(!showLineNumbers)}
             />
 
             {showSettings && settings ? (

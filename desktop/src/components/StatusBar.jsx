@@ -1,10 +1,14 @@
-import React, { useMemo } from 'react';
+import { useMemo } from 'react';
 
 function countWords(text) {
     if (!text) return 0;
     return text.trim().split(/\s+/).filter(Boolean).length;
 }
 
+// Status bar is now purely informational: status text, dirty indicator,
+// and document statistics (word/char counts, selection metrics, cursor
+// position, findings total). All action buttons live in the top bar so
+// the footer stays quiet and easy to read.
 function StatusBar({
     status,
     content,
@@ -12,17 +16,7 @@ function StatusBar({
     cursorColumn,
     selection,
     dirty,
-    issueCount,
-    lintEnabled,
-    showFindings,
-    onToggleLint,
-    onToggleFindings,
-    scanProgress,
-    onToggleAiScan,
-    onJumpNextFinding,
-    onRelint,
-    showLineNumbers,
-    onToggleLineNumbers
+    issueCount
 }) {
     const wordCount = useMemo(() => countWords(content), [content]);
     const charCount = content?.length ?? 0;
@@ -32,48 +26,9 @@ function StatusBar({
     // to flash "0 words selected" in the UI.
     const hasSelection = !!selection && selection.chars > 0;
 
-    // AI scan button state. scanProgress is either null (idle) or
-    // { current, total } while a scan is running. Label reflects both.
-    const scanning = !!scanProgress;
-    const scanPercent = scanning && scanProgress.total > 0
-        ? Math.round((scanProgress.current / scanProgress.total) * 100)
-        : 0;
-    const scanLabel = scanning
-        ? `AI Scan: ${scanPercent}%`
-        : 'AI Scan';
-    const scanTitle = scanning
-        ? `Scanning paragraph ${scanProgress.current} of ${scanProgress.total} — click to cancel`
-        : 'Run AI scan on the current document';
-
     return (
         <footer className="status-bar">
             <div className="status-bar-left">
-                {onToggleAiScan ? (
-                    <button
-                        type="button"
-                        className={`status-bar-scan ${scanning ? 'running' : ''}`}
-                        onClick={onToggleAiScan}
-                        title={scanTitle}
-                        aria-label={scanLabel}
-                    >
-                        <span className="status-bar-scan-icon" aria-hidden="true">
-                            {scanning ? '\u21bb' : '\u2728'}
-                        </span>
-                        <span>{scanLabel}</span>
-                    </button>
-                ) : null}
-                {onRelint ? (
-                    <button
-                        type="button"
-                        className="status-bar-scan"
-                        onClick={onRelint}
-                        title="Reload SPE rules and re-run the deterministic lint over the current document"
-                        aria-label="Re-lint"
-                    >
-                        <span className="status-bar-scan-icon" aria-hidden="true">{'\u21bb'}</span>
-                        <span>Re-lint</span>
-                    </button>
-                ) : null}
                 <span className="status-bar-text">{status}</span>
                 {dirty ? (
                     <span className="status-bar-dirty" title="Unsaved changes">
@@ -83,46 +38,6 @@ function StatusBar({
             </div>
 
             <div className="status-bar-right">
-                {/*
-                 * Toggle buttons show the FUTURE state — what happens when
-                 * you click — not the current state. This matches the
-                 * "button labels are verbs, not nouns" UX convention and
-                 * makes it obvious that clicking changes things rather
-                 * than reaffirms them.
-                 */}
-                <button
-                    type="button"
-                    className={`status-bar-toggle ${lintEnabled ? 'on' : 'off'}`}
-                    onClick={onToggleLint}
-                    title={lintEnabled ? 'Disable linting' : 'Enable linting'}
-                    aria-label={lintEnabled ? 'Click to turn lint off' : 'Click to turn lint on'}
-                >
-                    {lintEnabled ? 'Lint off' : 'Lint on'}
-                </button>
-
-                <button
-                    type="button"
-                    className={`status-bar-toggle ${showFindings ? 'on' : 'off'}`}
-                    onClick={onToggleFindings}
-                    disabled={!lintEnabled}
-                    title={showFindings ? 'Hide findings' : 'Show findings'}
-                    aria-label={`Click to ${showFindings ? 'hide' : 'show'} findings`}
-                >
-                    {showFindings ? 'Hide findings' : 'Show findings'}
-                </button>
-
-                {onToggleLineNumbers ? (
-                    <button
-                        type="button"
-                        className={`status-bar-toggle ${showLineNumbers ? 'on' : 'off'}`}
-                        onClick={onToggleLineNumbers}
-                        title={showLineNumbers ? 'Hide line numbers' : 'Show line numbers'}
-                        aria-label={`Click to ${showLineNumbers ? 'hide' : 'show'} line numbers`}
-                    >
-                        {showLineNumbers ? 'No #s' : 'Line #s'}
-                    </button>
-                ) : null}
-
                 <span className="status-bar-metric">{wordCount} words</span>
                 <span className="status-bar-metric">{charCount} chars</span>
                 {hasSelection ? (
@@ -133,16 +48,6 @@ function StatusBar({
                 {cursorLine && cursorColumn ? (
                     <span className="status-bar-metric">Ln {cursorLine}:{cursorColumn}</span>
                 ) : null}
-                <button
-                    type="button"
-                    className="status-bar-toggle"
-                    onClick={onJumpNextFinding}
-                    disabled={!issueCount}
-                    title="Jump to the next finding (by severity, then position)"
-                    aria-label="Next finding"
-                >
-                    Next {'\u203A'}
-                </button>
                 <span className="status-bar-metric">{issueCount} findings</span>
             </div>
         </footer>
