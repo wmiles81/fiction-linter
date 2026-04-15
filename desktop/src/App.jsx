@@ -572,6 +572,10 @@ function App() {
         const entry = buildFindingEntry(finding);
         const result = await window.api.appendAnnotation(activeTab.path, entry);
         if (result?.ok) {
+            // Refresh the containing dir so the annotation file becomes
+            // visible in the tree the first time it's written.
+            const parentDir = activeTab.path.replace(/\/[^/]+$/, '');
+            await refreshDirectoryInTree(parentDir);
             setStatus(`Logged to annotation file: ${result.annotationPath}`);
         } else {
             setStatus(`Annotation failed: ${result?.error || 'unknown error'}`);
@@ -654,6 +658,32 @@ function App() {
         setStatus(`Fix applied and logged. ${activeTab.path}.annotation.md`);
     };
 
+    // Refresh the file-tree node for a directory so newly-written sibling
+    // files (findings sidecar, annotation file, imported .md) appear
+    // without needing to reopen the folder. No-op if the directory
+    // isn't inside the currently-opened rootPath.
+    const refreshDirectoryInTree = async (dirPath) => {
+        if (!dirPath || !rootPath) return;
+        // Only refresh if dirPath is rootPath itself or a descendant.
+        if (dirPath !== rootPath && !dirPath.startsWith(rootPath + '/')) return;
+        try {
+            const entries = await window.api.listDirectory(dirPath);
+            if (dirPath === rootPath) {
+                setTree(buildNodes(entries));
+            } else {
+                // Preserve the node's own expanded state + everything
+                // else in the tree — just replace this directory's
+                // children with a fresh listing.
+                updateNode(dirPath, (node) => ({
+                    ...node,
+                    children: buildNodes(entries)
+                }));
+            }
+        } catch {
+            // Non-fatal — worst case the user reopens the folder manually.
+        }
+    };
+
     const handleSave = async () => {
         if (!activeTab?.path) return;
         const result = await window.api.writeFile(activeTab.path, activeTab.markdownSource);
@@ -677,6 +707,14 @@ function App() {
             findings: [...issues, ...aiIssues]
         });
         const findingsResult = await window.api.writeFindings(activeTab.path, payload);
+
+        // Refresh the file tree so the new .findings.json becomes visible
+        // without reopening the folder. Also picks up any other changes
+        // that happened in the same directory between now and the last
+        // listing (e.g., annotation files from earlier Fix-later clicks).
+        const parentDir = activeTab.path.replace(/\/[^/]+$/, '');
+        await refreshDirectoryInTree(parentDir);
+
         if (findingsResult?.ok) {
             setStatus(
                 `Saved. ${payload.counts.total} findings snapshot → ` +
