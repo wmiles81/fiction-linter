@@ -18,6 +18,8 @@ contextBridge.exposeInMainWorld('api', {
     aiScan: paragraph => ipcRenderer.invoke('ai:scan', { paragraph }),
     appendAnnotation: (sourcePath, entry) =>
         ipcRenderer.invoke('annotation:append', { sourcePath, entry }),
+    writeFindings: (sourcePath, payload) =>
+        ipcRenderer.invoke('findings:write', { sourcePath, payload }),
     fetchModels: config => ipcRenderer.invoke('models:fetch', config),
     loadTabs: () => ipcRenderer.invoke('tabs:load'),
     saveTabs: state => ipcRenderer.invoke('tabs:save', state),

@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef } from 'react';
 import { PatternLinterCore, NameValidatorCore } from '@shared/linting';
 import { scanDocument, findNextIssue } from './lib/aiScanner';
+import { buildFindingsPayload } from './lib/findingsFile';
 import FileTree from './components/FileTree';
 import Editor from './components/editor/Editor';
 import { htmlToMarkdown } from './components/editor/converters';
@@ -656,11 +657,37 @@ function App() {
     const handleSave = async () => {
         if (!activeTab?.path) return;
         const result = await window.api.writeFile(activeTab.path, activeTab.markdownSource);
-        if (result.ok) {
-            markSaved();
-            setStatus('Saved.');
-        } else {
+        if (!result.ok) {
             setStatus(result.error || 'Save failed.');
+            return;
+        }
+        markSaved();
+
+        // Snapshot the current findings alongside the saved document. The
+        // findings file is a deterministic sidecar keyed to the document
+        // state at save time — so its line/column/word numbers always
+        // match real positions in the markdown now on disk. Writing it
+        // here (not on auto-lint) keeps the file stable: no churn per
+        // keystroke, updates only on intentional user actions.
+        const plain = editorRef.current?.getPlainText?.() || content;
+        const payload = buildFindingsPayload({
+            path: activeTab.path,
+            name: activeTab.name,
+            plainText: plain,
+            findings: [...issues, ...aiIssues]
+        });
+        const findingsResult = await window.api.writeFindings(activeTab.path, payload);
+        if (findingsResult?.ok) {
+            setStatus(
+                `Saved. ${payload.counts.total} findings snapshot → ` +
+                `${findingsResult.findingsPath}`
+            );
+        } else {
+            // Don't fail the whole save over a findings-write issue —
+            // the document is already on disk. Just surface the error.
+            setStatus(
+                `Saved — but findings sidecar failed: ${findingsResult?.error || 'unknown error'}`
+            );
         }
     };
 

@@ -29,6 +29,7 @@ if (typeof window !== 'undefined' && !window.api) {
         aiComplete: async () => ({ ok: false, error: 'stub' }),
         aiScan: async () => ({ ok: false, error: 'stub' }),
         appendAnnotation: async () => ({ ok: true, annotationPath: '/tmp/stub.annotation.md' }),
+        writeFindings: async () => ({ ok: true, findingsPath: '/tmp/stub.findings.json' }),
         fetchModels: async () => ({ ok: true, models: [] }),
         loadTabs: async () => ({ tabs: [], activeTabId: null }),
         saveTabs: async state => state,

@@ -379,6 +379,29 @@ ipcMain.handle('annotation:append', async (_event, payload) => {
     }
 });
 
+// Write the findings snapshot alongside the source document as
+// `<path>.findings.json`. Always OVERWRITES — each save produces a fresh
+// deterministic snapshot of the current in-memory findings, aligned with
+// the just-saved document state. The renderer computes the payload (word
+// bounds, ordering, counts) via findingsFile.js; main just serializes
+// and writes. Pretty-printed with 2-space indent so git diffs are useful.
+ipcMain.handle('findings:write', async (_event, requestPayload) => {
+    const { sourcePath, payload } = requestPayload || {};
+    if (!sourcePath || typeof sourcePath !== 'string') {
+        return { ok: false, error: 'Missing sourcePath.' };
+    }
+    if (!payload || typeof payload !== 'object') {
+        return { ok: false, error: 'Missing findings payload.' };
+    }
+    const findingsPath = `${sourcePath}.findings.json`;
+    try {
+        fs.writeFileSync(findingsPath, JSON.stringify(payload, null, 2) + '\n', 'utf8');
+        return { ok: true, findingsPath };
+    } catch (error) {
+        return { ok: false, error: error.message };
+    }
+});
+
 // Read a .docx file as binary, run mammoth to convert to HTML. The renderer
 // then converts that HTML to markdown via the existing editor/converters.js
 // `htmlToMarkdown` (the same pipeline as paste handling), so .docx import
