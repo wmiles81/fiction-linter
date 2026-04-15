@@ -20,6 +20,7 @@ function StatusBar({
     scanProgress,
     onToggleAiScan,
     onJumpNextFinding,
+    onRelint,
     showLineNumbers,
     onToggleLineNumbers
 }) {
@@ -59,6 +60,18 @@ function StatusBar({
                             {scanning ? '\u21bb' : '\u2728'}
                         </span>
                         <span>{scanLabel}</span>
+                    </button>
+                ) : null}
+                {onRelint ? (
+                    <button
+                        type="button"
+                        className="status-bar-scan"
+                        onClick={onRelint}
+                        title="Reload SPE rules and re-run the deterministic lint over the current document"
+                        aria-label="Re-lint"
+                    >
+                        <span className="status-bar-scan-icon" aria-hidden="true">{'\u21bb'}</span>
+                        <span>Re-lint</span>
                     </button>
                 ) : null}
                 <span className="status-bar-text">{status}</span>

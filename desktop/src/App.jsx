@@ -198,8 +198,26 @@ function App() {
 
     useEffect(() => {
         if (!settings?.spePath) return;
-        window.api.loadSpeData(settings.spePath).then(setSpeData);
-    }, [settings?.spePath, setSpeData]);
+        window.api.loadSpeData(settings.spePath).then((data) => {
+            setSpeData(data);
+            // Surface silent "zero rules loaded" failures. Without this,
+            // a missing / mistyped / emptied SPE path would just leave the
+            // user with 0 findings and no explanation — they'd assume the
+            // linter is broken rather than "the rules directory is empty".
+            // Only nags once (via setStatus), doesn't spam.
+            const ruleCount =
+                Object.keys(data?.cliches || {}).length +
+                Object.keys(data?.names || {}).length +
+                Object.keys(data?.places || {}).length +
+                Object.keys(data?.protocols || {}).length;
+            if (ruleCount === 0) {
+                setStatus(
+                    `No SPE rules loaded from ${settings.spePath} — ` +
+                    `Settings → SPE Rules Path, or click Re-lint after fixing.`
+                );
+            }
+        });
+    }, [settings?.spePath, setSpeData, setStatus]);
 
     useEffect(() => {
         if (!lintEnabled || !content || !settings) {
@@ -469,6 +487,50 @@ function App() {
     // wrapping to the top of the document when the cursor is past the last
     // one. Uses the editor's current cursor offset (or 0 if nothing is
     // selected) so the navigation follows wherever the writer last clicked.
+    // Manually force a fresh deterministic (regex) lint pass. Reloads SPE
+    // rules from disk first — so if the user updated their SPE-Config
+    // files in another editor, or the initial load failed silently
+    // (spePath missing at startup, race with settings hydration), this
+    // recovers without needing a full app restart. Reports rule + finding
+    // counts to the status bar so the user sees the result.
+    const handleRelint = async () => {
+        if (!lintEnabled) {
+            setStatus('Lint is disabled — turn Lint on, then Re-lint.');
+            return;
+        }
+        if (!settings?.spePath) {
+            setStatus('No SPE path set — open Settings → SPE Rules Path to configure one.');
+            return;
+        }
+        setStatus('Reloading SPE rules…');
+        try {
+            const data = await window.api.loadSpeData(settings.spePath);
+            const ruleCount =
+                Object.keys(data?.cliches || {}).length +
+                Object.keys(data?.names || {}).length +
+                Object.keys(data?.places || {}).length +
+                Object.keys(data?.protocols || {}).length;
+            // Assigning a NEW object reference triggers the lint useEffect,
+            // which re-runs pattern + name linting against the current
+            // plain text and calls setIssues with the fresh results.
+            setSpeData(data || { cliches: {}, names: {}, places: {}, protocols: {} });
+            if (ruleCount === 0) {
+                setStatus(
+                    `Re-lint: 0 rules loaded from ${settings.spePath}. ` +
+                    `Check that the folder contains cliche_collider.yaml and friends.`
+                );
+            } else {
+                // Lint findings arrive ~300ms later (debounce). The status
+                // will be overwritten by the regular lint-count display
+                // when the next event touches it, so include the rule
+                // count here as the durable confirmation.
+                setStatus(`Re-lint: reloaded ${ruleCount} rules. Findings will refresh shortly.`);
+            }
+        } catch (err) {
+            setStatus(`Re-lint failed: ${err.message || 'unknown error'}`);
+        }
+    };
+
     const handleJumpNextFinding = () => {
         if (!editorRef.current || visibleIssues.length === 0) return;
         const cursor = editorRef.current.getCursorOffset?.() ?? -1;
@@ -815,6 +877,7 @@ function App() {
                 scanProgress={scanProgress}
                 onToggleAiScan={handleToggleAiScan}
                 onJumpNextFinding={handleJumpNextFinding}
+                onRelint={handleRelint}
                 showLineNumbers={showLineNumbers}
                 onToggleLineNumbers={() => setShowLineNumbers(!showLineNumbers)}
             />
