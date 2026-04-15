@@ -1,4 +1,4 @@
-import React from 'react';
+import { MIN_FONT_SIZE, MAX_FONT_SIZE, FONT_SIZE_STEP } from '../../store/useAppStore';
 
 function EditorToolbar({
     onCommand,
@@ -7,9 +7,20 @@ function EditorToolbar({
     wrap,
     canUndo,
     canRedo,
-    canSave
+    canSave,
+    editorFontSize,
+    onChangeFontSize
 }) {
     const fire = (kind, value) => () => onCommand?.({ kind, value });
+
+    // Font-size controls are optional — the toolbar still works without
+    // them (for consumers / tests that don't wire the prop). When wired,
+    // the buttons step by FONT_SIZE_STEP (2px) and disable at bounds so
+    // clicks can't overshoot.
+    const canShowFontControls = typeof onChangeFontSize === 'function' &&
+        typeof editorFontSize === 'number';
+    const decreaseDisabled = !canShowFontControls || editorFontSize <= MIN_FONT_SIZE;
+    const increaseDisabled = !canShowFontControls || editorFontSize >= MAX_FONT_SIZE;
 
     return (
         <div className="editor-toolbar" role="toolbar" aria-label="Editor toolbar">
@@ -100,6 +111,38 @@ function EditorToolbar({
             </button>
 
             <div className="editor-toolbar-spacer" />
+
+            {canShowFontControls ? (
+                <div className="editor-fontsize" role="group" aria-label="Editor font size">
+                    <button
+                        type="button"
+                        onClick={() => onChangeFontSize(editorFontSize - FONT_SIZE_STEP)}
+                        disabled={decreaseDisabled}
+                        title={`Decrease editor font size (currently ${editorFontSize}px)`}
+                        aria-label="Decrease font size"
+                        className="toolbar-button-format"
+                    >
+                        A−
+                    </button>
+                    <span
+                        className="editor-fontsize-readout"
+                        aria-live="polite"
+                        title="Current editor font size"
+                    >
+                        {editorFontSize}px
+                    </span>
+                    <button
+                        type="button"
+                        onClick={() => onChangeFontSize(editorFontSize + FONT_SIZE_STEP)}
+                        disabled={increaseDisabled}
+                        title={`Increase editor font size (currently ${editorFontSize}px)`}
+                        aria-label="Increase font size"
+                        className="toolbar-button-format"
+                    >
+                        A+
+                    </button>
+                </div>
+            ) : null}
 
             <button
                 type="button"

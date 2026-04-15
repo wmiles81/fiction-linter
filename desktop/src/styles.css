@@ -1198,6 +1198,25 @@ body {
     flex: 1;
 }
 
+/* Font-size group: A−, current size readout, A+. Sits in the right-side
+   view-preferences cluster of the format bar, alongside Wrap. */
+.editor-fontsize {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-right: 6px;
+}
+
+.editor-fontsize-readout {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--g-text-muted, #6b655b);
+    font-variant-numeric: tabular-nums;
+    min-width: 32px;
+    text-align: center;
+    user-select: none;
+}
+
 .toolbar-button-format strong,
 .toolbar-button-format em,
 .toolbar-button-format u {
@@ -1222,7 +1241,13 @@ body {
     overflow-x: hidden;
     padding: 20px 40px;
     font-family: 'Fraunces', Georgia, serif;
-    font-size: 16px;
+    /*
+     * font-size is user-adjustable via the A- / A+ buttons in the format
+     * bar. JS sets --editor-font-size on :root so both this surface AND
+     * the line-number gutter can read the same value. Fallback to 16px
+     * ensures the CSS still works if JS hydrate hasn't run yet.
+     */
+    font-size: var(--editor-font-size, 16px);
     line-height: 1.2;
     outline: none;
     background: var(--g-bg, #ffffff);
@@ -1297,14 +1322,14 @@ body {
     font-weight: 500;
     font-variant-numeric: tabular-nums;
     /*
-     * Match the editor paragraph line box (16px font × 1.2 line-height =
-     * 19.2px) so the 11px number text sits in a box the same height as a
-     * paragraph's first text line. With both spans placed at the same
-     * `top`, matching line-heights means both text baselines fall on the
-     * same horizontal axis — no visual "gutter is 3px above the text"
-     * drift.
+     * Match the editor paragraph line box so the number text sits in a
+     * box the same height as a paragraph's first text line. Paragraph
+     * line-height is 1.2 times font-size; since the font-size is now
+     * user-adjustable via --editor-font-size, compute the gutter line-
+     * height to match. Without this, resizing the font would desync the
+     * number baselines from the paragraph baselines.
      */
-    line-height: 19.2px;
+    line-height: calc(var(--editor-font-size, 16px) * 1.2);
 }
 
 .editor-surface.with-line-numbers {

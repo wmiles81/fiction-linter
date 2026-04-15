@@ -28,6 +28,8 @@ function App() {
     const updateNode = useAppStore(state => state.updateNode);
     const showLineNumbers = useAppStore(state => state.showLineNumbers);
     const setShowLineNumbers = useAppStore(state => state.setShowLineNumbers);
+    const editorFontSize = useAppStore(state => state.editorFontSize);
+    const setEditorFontSize = useAppStore(state => state.setEditorFontSize);
 
     const tabs = useEditorStore(state => state.tabs);
     const activeTabId = useEditorStore(state => state.activeTabId);
@@ -106,6 +108,10 @@ function App() {
     // so CSS theme selectors activate.
     useEffect(() => {
         useAppStore.getState().hydrateTheme();
+        // Same pattern for editor font size — paint the persisted value
+        // onto :root before React mounts, so the user doesn't see a flash
+        // of the default 16px before their preferred size loads.
+        useAppStore.getState().hydrateFontSize();
     }, []);
 
     // Restore the last-opened folder on startup. Reads from TWO sources in
@@ -951,6 +957,8 @@ function App() {
                         onFixLater={handleFixLater}
                         onFixNow={handleFixNow}
                         showLineNumbers={showLineNumbers}
+                        editorFontSize={editorFontSize}
+                        onChangeFontSize={setEditorFontSize}
                     />
                 </main>
             </div>

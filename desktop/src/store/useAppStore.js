@@ -16,6 +16,16 @@ const THEME_STORAGE_KEY = 'fl.theme';
 const DEFAULT_THEME = 'parchment';
 const LINE_NUMBERS_STORAGE_KEY = 'fl.showLineNumbers';
 
+// Editor font-size bounds. Default 16px matches the prose default; steps
+// of 2 feel like "one notch" to the user, smaller steps feel finicky.
+// 12-28 covers "too-small-to-draft-comfortably" to "almost presentation
+// mode" — if someone needs larger, OS-level zoom handles it.
+export const FONT_SIZE_STEP = 2;
+export const MIN_FONT_SIZE = 12;
+export const MAX_FONT_SIZE = 28;
+const DEFAULT_FONT_SIZE = 16;
+const FONT_SIZE_STORAGE_KEY = 'fl.editorFontSize';
+
 function readStoredTheme() {
     if (typeof window === 'undefined') return DEFAULT_THEME;
     try {
@@ -34,6 +44,28 @@ function readStoredLineNumbers() {
     }
 }
 
+function readStoredFontSize() {
+    if (typeof window === 'undefined') return DEFAULT_FONT_SIZE;
+    try {
+        const stored = parseInt(window.localStorage.getItem(FONT_SIZE_STORAGE_KEY), 10);
+        if (Number.isFinite(stored) && stored >= MIN_FONT_SIZE && stored <= MAX_FONT_SIZE) {
+            return stored;
+        }
+    } catch { /* private mode — fall through */ }
+    return DEFAULT_FONT_SIZE;
+}
+
+// Apply the font size by setting --editor-font-size on :root. Both the
+// editor surface and the line-number gutter read this var — the surface
+// for its prose font-size, the gutter for its line-height (via calc()).
+// Paragraph line-height stays at 1.2 so the gutter's line-height formula
+// (fontSize * 1.2) keeps the numbers aligned with their paragraphs at
+// any size.
+function applyFontSizeToDocument(size) {
+    if (typeof document === 'undefined') return;
+    document.documentElement.style.setProperty('--editor-font-size', `${size}px`);
+}
+
 // Apply the theme by setting the data-theme attribute on <html>. CSS
 // selectors in styles.css match on this attribute to activate the palette.
 function applyThemeToDocument(themeId) {
@@ -49,6 +81,7 @@ export const useAppStore = create((set, get) => ({
     tree: [],
     theme: readStoredTheme(),
     showLineNumbers: readStoredLineNumbers(),
+    editorFontSize: readStoredFontSize(),
 
     setSettings: (settings) => set({ settings }),
     setSpeData: (speData) => set({ speData: speData || emptySpeData }),
@@ -77,6 +110,25 @@ export const useAppStore = create((set, get) => ({
             window.localStorage.setItem(LINE_NUMBERS_STORAGE_KEY, next ? 'true' : 'false');
         } catch { /* non-fatal */ }
         set({ showLineNumbers: next });
+    },
+
+    // Clamped font-size setter + persist + apply to document. Callers can
+    // pass raw increments (e.g., current + FONT_SIZE_STEP) without worrying
+    // about bounds — anything outside MIN/MAX is rejected silently so the
+    // button can be clicked at the limit without crashing.
+    setEditorFontSize: (size) => {
+        const n = Number(size);
+        if (!Number.isFinite(n)) return;
+        const clamped = Math.max(MIN_FONT_SIZE, Math.min(MAX_FONT_SIZE, Math.round(n)));
+        applyFontSizeToDocument(clamped);
+        try {
+            window.localStorage.setItem(FONT_SIZE_STORAGE_KEY, String(clamped));
+        } catch { /* non-fatal */ }
+        set({ editorFontSize: clamped });
+    },
+
+    hydrateFontSize: () => {
+        applyFontSizeToDocument(get().editorFontSize);
     },
 
     updateNode: (nodePath, updater) => {

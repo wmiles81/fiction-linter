@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { useAppStore, THEMES } from './useAppStore';
+import { useAppStore, THEMES, MIN_FONT_SIZE, MAX_FONT_SIZE, FONT_SIZE_STEP } from './useAppStore';
 
 describe('useAppStore', () => {
     beforeEach(() => {
@@ -80,5 +80,57 @@ describe('useAppStore — theme', () => {
         useAppStore.setState({ theme: 'sepia' });
         useAppStore.getState().hydrateTheme();
         expect(document.documentElement.getAttribute('data-theme')).toBe('sepia');
+    });
+});
+
+describe('useAppStore — editor font size', () => {
+    beforeEach(() => {
+        try { window.localStorage.removeItem('fl.editorFontSize'); } catch { /* ignore */ }
+        document.documentElement.style.removeProperty('--editor-font-size');
+        useAppStore.setState({ editorFontSize: 16 });
+    });
+
+    it('exposes step and bounds constants', () => {
+        // EditorToolbar imports these to disable buttons at the limits;
+        // pinning them in a test guards against a typo bricking the UI.
+        expect(FONT_SIZE_STEP).toBe(2);
+        expect(MIN_FONT_SIZE).toBeLessThan(MAX_FONT_SIZE);
+        expect(MIN_FONT_SIZE).toBeGreaterThanOrEqual(8);
+        expect(MAX_FONT_SIZE).toBeLessThanOrEqual(48);
+    });
+
+    it('setEditorFontSize updates state, CSS var, and localStorage', () => {
+        useAppStore.getState().setEditorFontSize(20);
+        expect(useAppStore.getState().editorFontSize).toBe(20);
+        expect(document.documentElement.style.getPropertyValue('--editor-font-size')).toBe('20px');
+        expect(window.localStorage.getItem('fl.editorFontSize')).toBe('20');
+    });
+
+    it('clamps below MIN_FONT_SIZE', () => {
+        useAppStore.getState().setEditorFontSize(MIN_FONT_SIZE - 100);
+        expect(useAppStore.getState().editorFontSize).toBe(MIN_FONT_SIZE);
+    });
+
+    it('clamps above MAX_FONT_SIZE', () => {
+        useAppStore.getState().setEditorFontSize(MAX_FONT_SIZE + 100);
+        expect(useAppStore.getState().editorFontSize).toBe(MAX_FONT_SIZE);
+    });
+
+    it('rounds non-integer inputs', () => {
+        useAppStore.getState().setEditorFontSize(17.6);
+        expect(useAppStore.getState().editorFontSize).toBe(18);
+    });
+
+    it('silently ignores non-finite inputs (no state change)', () => {
+        useAppStore.setState({ editorFontSize: 14 });
+        useAppStore.getState().setEditorFontSize(Number.NaN);
+        useAppStore.getState().setEditorFontSize('not a number');
+        expect(useAppStore.getState().editorFontSize).toBe(14);
+    });
+
+    it('hydrateFontSize paints the current size onto :root', () => {
+        useAppStore.setState({ editorFontSize: 22 });
+        useAppStore.getState().hydrateFontSize();
+        expect(document.documentElement.style.getPropertyValue('--editor-font-size')).toBe('22px');
     });
 });

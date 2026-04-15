@@ -37,7 +37,9 @@ const Editor = forwardRef(function Editor({
     onToggleWrap,
     onFixLater,
     onFixNow,
-    showLineNumbers
+    showLineNumbers,
+    editorFontSize,
+    onChangeFontSize
 }, ref) {
     const editorRef = useRef(null);
     const gutterInnerRef = useRef(null);
@@ -326,7 +328,7 @@ const Editor = forwardRef(function Editor({
             observer.disconnect();
             window.removeEventListener('resize', recompute);
         };
-    }, [showLineNumbers, value]);
+    }, [showLineNumbers, value, editorFontSize]);
 
     // Scroll-sync: translate the gutter's inner container by the editor's
     // negative scrollTop so numbers stay aligned with their blocks as the
@@ -437,6 +439,8 @@ const Editor = forwardRef(function Editor({
                 canUndo={true}
                 canRedo={true}
                 canSave={true}
+                editorFontSize={editorFontSize}
+                onChangeFontSize={onChangeFontSize}
             />
             <div className="editor-body">
                 {showLineNumbers ? (
