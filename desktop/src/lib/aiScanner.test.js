@@ -242,25 +242,32 @@ describe('callChunkWithRetry', () => {
 describe('findNextIssue', () => {
     const issues = [
         { start: 10,  end: 15,  severity: 'info'    }, // A
-        { start: 40,  end: 50,  severity: 'error'   }, // B — most severe
+        { start: 40,  end: 50,  severity: 'error'   }, // B
         { start: 80,  end: 90,  severity: 'warning' }, // C
-        { start: 120, end: 125, severity: 'error'   }  // D — error later in doc
+        { start: 120, end: 125, severity: 'error'   }  // D
     ];
 
-    it('picks the most severe issue after the cursor', () => {
-        // Cursor at 20: after = [B,C,D]. Most severe = B (error at 40).
-        const next = findNextIssue(issues, 20);
-        expect(next.start).toBe(40);
+    it('picks the closest finding after the cursor, regardless of severity', () => {
+        // Cursor at 20: after = [B,C,D]. B (at 40) is closest.
+        expect(findNextIssue(issues, 20).start).toBe(40);
+        // Cursor at 50: after = [C,D]. C (at 80) is closest even though
+        // D (at 120) is more severe.
+        expect(findNextIssue(issues, 50).start).toBe(80);
     });
 
-    it('breaks severity ties by document position', () => {
-        // Cursor at 60: after = [C,D]. C is warning, D is error → D wins.
-        const next = findNextIssue(issues, 60);
-        expect(next.start).toBe(120);
-        // Cursor at 130: after = []. Wraps — most severe overall = B or D (both error).
-        // D is already been passed, but wrap picks by rank then position, so B wins.
-        const wrapped = findNextIssue(issues, 130);
-        expect(wrapped.start).toBe(40);
+    it('uses severity as a tiebreaker when two findings share the same start', () => {
+        const tied = [
+            { start: 10, end: 15, severity: 'info' },
+            { start: 10, end: 20, severity: 'error' }
+        ];
+        // Same start → error comes first.
+        expect(findNextIssue(tied, 0).severity).toBe('error');
+    });
+
+    it('wraps to the first finding in the document when past the last one', () => {
+        const next = findNextIssue(issues, 999);
+        // Wraps — A (at 10) is the first in document order.
+        expect(next.start).toBe(10);
     });
 
     it('returns null for empty issues list', () => {
@@ -268,10 +275,18 @@ describe('findNextIssue', () => {
         expect(findNextIssue(null, 0)).toBe(null);
     });
 
-    it('wraps to the most severe issue when past the last one', () => {
-        const next = findNextIssue(issues, 999);
-        // Wraps — B (error at 40) outranks D (error at 120) by position.
-        expect(next.start).toBe(40);
+    it('cycles through all findings regardless of severity', () => {
+        // Simulate clicking Next from the very start, verify we visit
+        // every finding in document order before wrapping.
+        const visited = [];
+        let cursor = -1;
+        for (let i = 0; i < issues.length + 1; i++) {
+            const next = findNextIssue(issues, cursor);
+            if (!next || visited.includes(next.start)) break;
+            visited.push(next.start);
+            cursor = next.start;
+        }
+        expect(visited).toEqual([10, 40, 80, 120]);
     });
 });
 

@@ -169,26 +169,26 @@ export const SEVERITY_RANK = {
 
 /**
  * Given a list of issues and the current cursor offset, return the NEXT
- * issue to jump to. "Next" means: the most severe issue whose start is
- * strictly after the cursor; ties broken by document position. Wraps to the
- * beginning when no issues remain after the cursor, so repeated clicks
- * cycle through the whole set.
+ * issue to jump to. "Next" means: the closest finding whose start is
+ * strictly after the cursor, regardless of severity. Severity is a
+ * tiebreaker when two findings start at the exact same offset (show the
+ * more severe one first). Wraps to the top of the document when no
+ * issues remain after the cursor, so repeated clicks cycle through
+ * every finding in document order.
  */
 export function findNextIssue(issues, cursorOffset) {
     if (!issues || issues.length === 0) return null;
-    const sortByRankThenPosition = (a, b) => {
+    const byPosition = (a, b) => {
+        if (a.start !== b.start) return a.start - b.start;
         const ra = SEVERITY_RANK[a.severity] ?? 99;
         const rb = SEVERITY_RANK[b.severity] ?? 99;
-        if (ra !== rb) return ra - rb;
-        return a.start - b.start;
+        return ra - rb;
     };
-    // First pick: the most severe issue after the cursor.
     const after = issues.filter(i => i.start > cursorOffset);
     if (after.length > 0) {
-        return [...after].sort(sortByRankThenPosition)[0];
+        return [...after].sort(byPosition)[0];
     }
-    // Wrap: most severe in the whole document.
-    return [...issues].sort(sortByRankThenPosition)[0];
+    return [...issues].sort(byPosition)[0];
 }
 
 /**
