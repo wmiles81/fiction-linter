@@ -10,6 +10,7 @@ const { getDefaultSpePath: resolveDefaultSpePath } = require('./spePath');
 const { installMenu } = require('./menu');
 const { readStoredLicense, storeLicense, clearLicense, shouldRevalidate, validateLicenseKey } = require('./licensing');
 
+let mainWindow = null;
 
 // Google Docs authentication uses Electron's default session (the same one
 // the main window uses). Earlier attempts with a custom partition
@@ -214,7 +215,7 @@ function writeLastRootPath(rootPath) {
 }
 
 function createWindow() {
-    const window = new BrowserWindow({
+    mainWindow = new BrowserWindow({
         width: 1280,
         height: 820,
         minWidth: 980,
@@ -231,16 +232,21 @@ function createWindow() {
     const devServerUrl = process.env.VITE_DEV_SERVER_URL;
 
     if (isDev && devServerUrl) {
-        window.loadURL(devServerUrl);
-        window.webContents.openDevTools({ mode: 'detach' });
+        mainWindow.loadURL(devServerUrl);
+        mainWindow.webContents.openDevTools({ mode: 'detach' });
     } else {
-        window.loadFile(path.join(__dirname, '../dist/index.html'));
+        mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
     }
 }
 
 app.whenReady().then(() => {
     createWindow();
     installMenu();
+
+    const { initAutoUpdater } = require('./updater');
+    if (app.isPackaged) {
+        initAutoUpdater(mainWindow);
+    }
 
     app.on('activate', () => {
         if (BrowserWindow.getAllWindows().length === 0) {
@@ -811,4 +817,9 @@ ipcMain.handle('ai:scan', async (_event, payload) => {
         hyperparameters: settings.ai.hyperparameters,
         messages
     });
+});
+
+ipcMain.handle('update:install', async () => {
+    const { installUpdate } = require('./updater');
+    installUpdate();
 });

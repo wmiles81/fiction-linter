@@ -195,6 +195,14 @@ function App() {
     }, []);
 
     useEffect(() => {
+        if (!window.api?.onUpdateReady) return;
+        const unsub = window.api.onUpdateReady((info) => {
+            setStatus(`Update available: v${info.version}. Restart to install.`);
+        });
+        return unsub;
+    }, [setStatus]);
+
+    useEffect(() => {
         if (!window.api?.onMenuAction) return;
         const unsubscribe = window.api.onMenuAction((payload) => {
             const action = payload?.action;

@@ -33,5 +33,11 @@ contextBridge.exposeInMainWorld('api', {
         const handler = (_event, payload) => callback(payload);
         ipcRenderer.on('menu:action', handler);
         return () => ipcRenderer.removeListener('menu:action', handler);
-    }
+    },
+    onUpdateReady: (callback) => {
+        const handler = (_event, info) => callback(info);
+        ipcRenderer.on('update:ready', handler);
+        return () => ipcRenderer.removeListener('update:ready', handler);
+    },
+    installUpdate: () => ipcRenderer.invoke('update:install'),
 });

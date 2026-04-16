@@ -38,6 +38,8 @@ if (typeof window !== 'undefined' && !window.api) {
         validateLicense: async () => ({ valid: true, email: 'test@test.com', name: 'Test' }),
         revalidateLicense: async () => ({ valid: true }),
         deactivateLicense: async () => ({ ok: true }),
-        onMenuAction: (_cb) => () => {}
+        onMenuAction: (_cb) => () => {},
+        onUpdateReady: (_cb) => () => {},
+        installUpdate: async () => {},
     };
 }
