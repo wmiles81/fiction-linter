@@ -1578,3 +1578,57 @@ body {
     flex-direction: column;
     gap: 10px;
 }
+
+/* Error boundary — catches unhandled render errors */
+.error-boundary {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    text-align: center;
+    padding: 40px;
+    color: var(--ink);
+}
+
+.error-boundary details {
+    margin: 16px 0;
+    max-width: 600px;
+    text-align: left;
+}
+
+.error-boundary pre {
+    font-size: 11px;
+    overflow-x: auto;
+    background: rgba(0,0,0,0.05);
+    padding: 12px;
+    border-radius: 8px;
+}
+
+/* Welcome screen — shown when no tabs are open */
+.welcome-screen {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+    text-align: center;
+    padding: 40px;
+    color: var(--muted);
+}
+
+.welcome-screen h2 {
+    font-family: 'Fraunces', serif;
+    font-size: 24px;
+    color: var(--ink);
+    margin-bottom: 8px;
+}
+
+.welcome-features {
+    text-align: left;
+    margin: 16px 0 24px;
+    font-size: 14px;
+    line-height: 1.6;
+    list-style: disc;
+    padding-left: 20px;
+}

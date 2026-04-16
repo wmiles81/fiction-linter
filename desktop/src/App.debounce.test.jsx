@@ -44,7 +44,10 @@ describe('App — lint debounce', () => {
         expect(lintSpy).not.toHaveBeenCalled();
 
         // Open folder, then click the file to load its content.
-        await user.click(screen.getByRole('button', { name: /Open Folder/i }));
+        // Use getAllByRole because the WelcomeScreen also renders an "Open Folder"
+        // button when no tabs are open — both wire to handleChooseFolder, so
+        // clicking either one is equivalent.
+        await user.click(screen.getAllByRole('button', { name: /Open Folder/i })[0]);
         await act(async () => { await Promise.resolve(); });
         await user.click(await screen.findByText('story.md'));
         await act(async () => { await Promise.resolve(); });

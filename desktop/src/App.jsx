@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useRef } from 'react';
 import { PatternLinterCore, NameValidatorCore } from '@shared/linting';
 import { scanDocument, findNextIssue } from './lib/aiScanner';
 import { buildFindingsPayload } from './lib/findingsFile';
+import ErrorBoundary from './components/ErrorBoundary';
+import WelcomeScreen from './components/WelcomeScreen';
 import FileTree from './components/FileTree';
 import Editor from './components/editor/Editor';
 import { htmlToMarkdown } from './components/editor/converters';
@@ -950,6 +952,7 @@ function App() {
 
     // licenseState === 'licensed' — render the full app below
     return (
+        <ErrorBoundary>
         <div className="app-shell">
             <header className="top-bar">
                 <div className="brand">
@@ -1105,22 +1108,26 @@ function App() {
                         onClose={closeTab}
                         onCloseAll={closeAllTabs}
                     />
-                    <Editor
-                        ref={editorRef}
-                        value={content}
-                        onChange={updateContent}
-                        issues={visibleIssues}
-                        showFindings={showFindings}
-                        onSave={handleSave}
-                        onStateChange={setEditorState}
-                        wrap={wrap}
-                        onToggleWrap={() => setWrap(w => !w)}
-                        onFixLater={handleFixLater}
-                        onFixNow={handleFixNow}
-                        showLineNumbers={showLineNumbers}
-                        editorFontSize={editorFontSize}
-                        onChangeFontSize={setEditorFontSize}
-                    />
+                    {tabs.length === 0 ? (
+                        <WelcomeScreen onOpenFolder={handleChooseFolder} />
+                    ) : (
+                        <Editor
+                            ref={editorRef}
+                            value={content}
+                            onChange={updateContent}
+                            issues={visibleIssues}
+                            showFindings={showFindings}
+                            onSave={handleSave}
+                            onStateChange={setEditorState}
+                            wrap={wrap}
+                            onToggleWrap={() => setWrap(w => !w)}
+                            onFixLater={handleFixLater}
+                            onFixNow={handleFixNow}
+                            showLineNumbers={showLineNumbers}
+                            editorFontSize={editorFontSize}
+                            onChangeFontSize={setEditorFontSize}
+                        />
+                    )}
                 </main>
             </div>
 
@@ -1142,6 +1149,7 @@ function App() {
                 />
             ) : null}
         </div>
+        </ErrorBoundary>
     );
 }
 
