@@ -93,6 +93,7 @@
           ]
         }
       ],
+      "icon": "build/icon.icns",
       "identity": null
     },
     "win": {
@@ -103,14 +104,16 @@
             "x64"
           ]
         }
-      ]
+      ],
+      "icon": "build/icon.ico"
     },
     "linux": {
       "target": [
         "AppImage",
         "deb"
       ],
-      "category": "Office"
+      "category": "Office",
+      "icon": "build/icon.png"
     }
   }
 }
