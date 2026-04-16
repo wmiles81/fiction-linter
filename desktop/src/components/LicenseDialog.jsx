@@ -1,9 +1,26 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+
+// Dev-only bypass: Cmd+Shift+D (Mac) / Ctrl+Shift+D (Win/Linux) skips
+// the license gate. Only works when VITE_DEV_SERVER_URL is set (dev mode).
+// Stripped from production builds because the env var is absent.
+const DEV_MODE = !!import.meta.env?.VITE_DEV_SERVER_URL;
 
 function LicenseDialog({ onActivated }) {
     const [key, setKey] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+        if (!DEV_MODE) return;
+        const handler = (e) => {
+            if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'D') {
+                e.preventDefault();
+                onActivated({ email: 'dev@localhost', name: 'Dev Bypass' });
+            }
+        };
+        window.addEventListener('keydown', handler);
+        return () => window.removeEventListener('keydown', handler);
+    }, [onActivated]);
 
     const handleActivate = async () => {
         const trimmed = key.trim();
