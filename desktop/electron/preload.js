@@ -25,6 +25,10 @@ contextBridge.exposeInMainWorld('api', {
     fetchModels: config => ipcRenderer.invoke('models:fetch', config),
     loadTabs: () => ipcRenderer.invoke('tabs:load'),
     saveTabs: state => ipcRenderer.invoke('tabs:save', state),
+    getLicenseInfo: () => ipcRenderer.invoke('license:get'),
+    validateLicense: (key) => ipcRenderer.invoke('license:validate', key),
+    revalidateLicense: () => ipcRenderer.invoke('license:revalidate'),
+    deactivateLicense: () => ipcRenderer.invoke('license:deactivate'),
     onMenuAction: (callback) => {
         const handler = (_event, payload) => callback(payload);
         ipcRenderer.on('menu:action', handler);

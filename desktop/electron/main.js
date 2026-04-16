@@ -8,6 +8,7 @@ const { fetchModels } = require('./modelCatalog');
 const { buildExplainMessages, buildRewriteMessages, buildScanMessages } = require('./prompts');
 const { getDefaultSpePath: resolveDefaultSpePath } = require('./spePath');
 const { installMenu } = require('./menu');
+const { readStoredLicense, storeLicense, clearLicense, shouldRevalidate, validateLicenseKey } = require('./licensing');
 
 
 // Google Docs authentication uses Electron's default session (the same one
@@ -252,6 +253,45 @@ app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') {
         app.quit();
     }
+});
+
+ipcMain.handle('license:get', async () => {
+    const stored = readStoredLicense();
+    if (!stored) return { licensed: false };
+    return {
+        licensed: true,
+        email: stored.email,
+        name: stored.name,
+        needsRevalidation: shouldRevalidate(stored.validatedAt)
+    };
+});
+
+ipcMain.handle('license:validate', async (_event, key) => {
+    const result = await validateLicenseKey(key, 'fiction-linter');
+    if (result.valid) {
+        storeLicense({
+            key,
+            productId: 'fiction-linter',
+            email: result.email,
+            name: result.name
+        });
+    }
+    return result;
+});
+
+ipcMain.handle('license:revalidate', async () => {
+    const stored = readStoredLicense();
+    if (!stored) return { valid: false, error: 'No stored key.' };
+    const result = await validateLicenseKey(stored.key, stored.productId);
+    if (result.valid) {
+        storeLicense({ ...stored, email: result.email, name: result.name });
+    }
+    return result;
+});
+
+ipcMain.handle('license:deactivate', async () => {
+    clearLicense();
+    return { ok: true };
 });
 
 ipcMain.handle('dialog:chooseFolder', async () => {

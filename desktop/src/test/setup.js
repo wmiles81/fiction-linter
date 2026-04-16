@@ -34,6 +34,10 @@ if (typeof window !== 'undefined' && !window.api) {
         fetchModels: async () => ({ ok: true, models: [] }),
         loadTabs: async () => ({ tabs: [], activeTabId: null }),
         saveTabs: async state => state,
+        getLicenseInfo: async () => ({ licensed: true, email: 'test@test.com', name: 'Test', needsRevalidation: false }),
+        validateLicense: async () => ({ valid: true, email: 'test@test.com', name: 'Test' }),
+        revalidateLicense: async () => ({ valid: true }),
+        deactivateLicense: async () => ({ ok: true }),
         onMenuAction: (_cb) => () => {}
     };
 }
