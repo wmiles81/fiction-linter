@@ -130,6 +130,19 @@ function buildMenuTemplate() {
             label: 'Help',
             submenu: [
                 {
+                    label: 'Fiction Linter Help',
+                    accelerator: 'F1',
+                    click: () => sendToRenderer('menu:action', { action: 'open-help' })
+                },
+                {
+                    label: 'Online Documentation',
+                    click: () => {
+                        const { shell } = require('electron');
+                        shell.openExternal('https://ocotilloquillpress.com/docs/fiction-linter');
+                    }
+                },
+                { type: 'separator' },
+                {
                     label: 'About Fiction Linter',
                     click: () => sendToRenderer('menu:action', { action: 'show-about' })
                 },
@@ -140,11 +153,6 @@ function buildMenuTemplate() {
                 {
                     label: 'Deactivate License...',
                     click: () => sendToRenderer('menu:action', { action: 'deactivate-license' })
-                },
-                { type: 'separator' },
-                {
-                    label: 'Fiction Linter Documentation',
-                    click: () => sendToRenderer('menu:action', { action: 'open-help' })
                 }
             ]
         }

@@ -14,6 +14,8 @@ import TabBar from './components/TabBar';
 import StatusBar from './components/StatusBar';
 import ThemePicker from './components/ThemePicker';
 import LicenseDialog from './components/LicenseDialog';
+import HelpTab from './components/HelpTab';
+import HelpPopup from './components/HelpPopup';
 import { getFileKind } from './lib/fileEligibility';
 import { useAppStore } from './store/useAppStore';
 import { useEditorStore } from './store/useEditorStore';
@@ -69,6 +71,9 @@ function App() {
 
     const [showSettings, setShowSettings] = React.useState(false);
     const [showAbout, setShowAbout] = React.useState(false);
+    const [helpTopics, setHelpTopics] = React.useState([]);
+    const [helpPopup, setHelpPopup] = React.useState(null);
+    const [helpInitialTopic, setHelpInitialTopic] = React.useState(null);
     const [wrap, setWrap] = React.useState(true);
     const [leftPanelWidth, setLeftPanelWidth] = React.useState(() => {
         if (typeof window === 'undefined') return 260;
@@ -87,6 +92,16 @@ function App() {
         try {
             window.localStorage.setItem('fl.leftPanelWidth', String(newWidth));
         } catch { /* quota, private mode, etc. — non-fatal */ }
+    };
+
+    const handleOpenHelp = (topicId = null) => {
+        setHelpInitialTopic(topicId);
+        const existingHelp = tabs.find(t => t.name === 'Help' && !t.path);
+        if (existingHelp) {
+            setActiveTab(existingHelp.id);
+        } else {
+            openFile({ path: null, name: 'Help', markdownSource: '' });
+        }
     };
 
     const editorRef = useRef(null);
@@ -195,6 +210,41 @@ function App() {
     }, []);
 
     useEffect(() => {
+        window.api.loadHelp?.().then(topics => {
+            if (topics) setHelpTopics(topics);
+        }).catch(() => {});
+    }, []);
+
+    useEffect(() => {
+        const handler = (e) => {
+            if (e.key === 'F1') {
+                e.preventDefault();
+                handleOpenHelp();
+            }
+        };
+        window.addEventListener('keydown', handler);
+        return () => window.removeEventListener('keydown', handler);
+    }, []);
+
+    useEffect(() => {
+        const handler = (e) => {
+            const helpEl = e.target.closest('[data-help-id]');
+            if (!helpEl) return;
+            e.preventDefault();
+            const helpId = helpEl.getAttribute('data-help-id');
+            const topic = helpTopics.find(t => t.id === helpId);
+            if (!topic) return;
+            const rect = helpEl.getBoundingClientRect();
+            setHelpPopup({
+                topic: { id: topic.id, title: topic.title, summary: topic.summary },
+                position: { x: rect.left + rect.width / 2, y: rect.top - 8 }
+            });
+        };
+        window.addEventListener('contextmenu', handler);
+        return () => window.removeEventListener('contextmenu', handler);
+    }, [helpTopics]);
+
+    useEffect(() => {
         if (!window.api?.onUpdateReady) return;
         const unsub = window.api.onUpdateReady((info) => {
             setStatus(`Update available: v${info.version}. Restart to install.`);
@@ -246,7 +296,7 @@ function App() {
                     setStatus('Find not yet implemented.');
                     break;
                 case 'open-help':
-                    window.open('https://github.com/wmiles81/fiction-linter', '_blank');
+                    handleOpenHelp();
                     break;
                 default:
                     break;
@@ -993,6 +1043,7 @@ function App() {
                     <div className="toolbar-group">
                         <button
                             type="button"
+                            data-help-id="toolbar-ai-scan"
                             className={`toolbar-btn toolbar-btn-action ${scanProgress ? 'running' : ''}`}
                             onClick={handleToggleAiScan}
                             title={scanProgress
@@ -1010,6 +1061,7 @@ function App() {
                         </button>
                         <button
                             type="button"
+                            data-help-id="toolbar-re-lint"
                             className="toolbar-btn toolbar-btn-action"
                             onClick={handleRelint}
                             title="Reload SPE rules and re-run the deterministic lint over the current document"
@@ -1022,6 +1074,7 @@ function App() {
                     <div className="toolbar-group">
                         <button
                             type="button"
+                            data-help-id="toolbar-lint-toggle"
                             className={`toolbar-btn ${lintEnabled ? 'on' : 'off'}`}
                             onClick={() => setLintEnabled(!lintEnabled)}
                             title={lintEnabled ? 'Disable linting' : 'Enable linting'}
@@ -1030,6 +1083,7 @@ function App() {
                         </button>
                         <button
                             type="button"
+                            data-help-id="toolbar-findings-toggle"
                             className={`toolbar-btn ${showFindings ? 'on' : 'off'}`}
                             onClick={() => setShowFindings(!showFindings)}
                             disabled={!lintEnabled}
@@ -1039,6 +1093,7 @@ function App() {
                         </button>
                         <button
                             type="button"
+                            data-help-id="toolbar-line-numbers"
                             className={`toolbar-btn ${showLineNumbers ? 'on' : 'off'}`}
                             onClick={() => setShowLineNumbers(!showLineNumbers)}
                             title={showLineNumbers ? 'Hide line numbers' : 'Show line numbers'}
@@ -1050,6 +1105,7 @@ function App() {
                     <div className="toolbar-group">
                         <button
                             type="button"
+                            data-help-id="toolbar-next-finding"
                             className="toolbar-btn"
                             onClick={handleJumpNextFinding}
                             disabled={!visibleIssues.length}
@@ -1061,9 +1117,23 @@ function App() {
                 </div>
 
                 <div className="top-actions">
-                    <ThemePicker />
                     <button
                         className="icon-button"
+                        onClick={() => handleOpenHelp()}
+                        aria-label="Help"
+                        title="Help (F1)"
+                    >
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+                             strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                            <circle cx="12" cy="12" r="10" />
+                            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+                            <line x1="12" y1="17" x2="12.01" y2="17" />
+                        </svg>
+                    </button>
+                    <ThemePicker data-help-id="themes-overview" />
+                    <button
+                        className="icon-button"
+                        data-help-id="settings-overview"
                         onClick={() => setShowSettings(true)}
                         aria-label="Open settings"
                         title="Settings"
@@ -1129,7 +1199,9 @@ function App() {
                         onClose={closeTab}
                         onCloseAll={closeAllTabs}
                     />
-                    {tabs.length === 0 ? (
+                    {activeTab?.name === 'Help' && !activeTab?.path ? (
+                        <HelpTab topics={helpTopics} initialTopicId={helpInitialTopic} />
+                    ) : tabs.length === 0 ? (
                         <WelcomeScreen onOpenFolder={handleChooseFolder} />
                     ) : (
                         <Editor
@@ -1174,6 +1246,17 @@ function App() {
                     onClose={() => setShowAbout(false)}
                     licenseInfo={licenseInfo}
                     version="1.0.0"
+                />
+            ) : null}
+            {helpPopup ? (
+                <HelpPopup
+                    topic={helpPopup.topic}
+                    position={helpPopup.position}
+                    onClose={() => setHelpPopup(null)}
+                    onMore={(topicId) => {
+                        setHelpPopup(null);
+                        handleOpenHelp(topicId);
+                    }}
                 />
             ) : null}
         </div>
