@@ -13,7 +13,7 @@ function LicenseDialog({ onActivated }) {
     useEffect(() => {
         if (!DEV_MODE) return;
         const handler = (e) => {
-            if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'D') {
+            if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'K') {
                 e.preventDefault();
                 onActivated({ email: 'dev@localhost', name: 'Dev Bypass' });
             }
