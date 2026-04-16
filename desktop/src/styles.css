@@ -1632,3 +1632,49 @@ body {
     list-style: disc;
     padding-left: 20px;
 }
+
+/* About dialog */
+.about-card {
+    width: 360px;
+    max-width: 90vw;
+    padding: 36px;
+    background: var(--surface-strong, #ffffff);
+    border: 1px solid var(--border, #d3d5da);
+    border-radius: 16px;
+    box-shadow: var(--shadow);
+    text-align: center;
+}
+
+.about-title {
+    font-family: 'Fraunces', serif;
+    font-size: 22px;
+    margin: 0 0 4px;
+    color: var(--ink);
+}
+
+.about-version {
+    font-size: 14px;
+    color: var(--muted);
+    margin: 0 0 16px;
+    font-variant-numeric: tabular-nums;
+}
+
+.about-licensee {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--ink);
+    margin: 0 0 4px;
+}
+
+.about-publisher {
+    font-size: 12px;
+    color: var(--muted);
+    margin: 0 0 4px;
+}
+
+.about-copyright {
+    font-size: 11px;
+    color: var(--muted);
+    margin: 0 0 20px;
+    opacity: 0.7;
+}

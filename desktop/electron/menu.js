@@ -14,7 +14,10 @@ function buildMenuTemplate() {
         ...(isMac ? [{
             label: app.name,
             submenu: [
-                { role: 'about' },
+                {
+                    label: 'About Fiction Linter',
+                    click: () => sendToRenderer('menu:action', { action: 'show-about' })
+                },
                 { type: 'separator' },
                 {
                     label: 'Settings…',
@@ -126,6 +129,19 @@ function buildMenuTemplate() {
         {
             label: 'Help',
             submenu: [
+                {
+                    label: 'About Fiction Linter',
+                    click: () => sendToRenderer('menu:action', { action: 'show-about' })
+                },
+                {
+                    label: 'Check for Updates...',
+                    click: () => sendToRenderer('menu:action', { action: 'check-updates' })
+                },
+                {
+                    label: 'Deactivate License...',
+                    click: () => sendToRenderer('menu:action', { action: 'deactivate-license' })
+                },
+                { type: 'separator' },
                 {
                     label: 'Fiction Linter Documentation',
                     click: () => sendToRenderer('menu:action', { action: 'open-help' })

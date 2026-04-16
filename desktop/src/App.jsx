@@ -8,6 +8,7 @@ import FileTree from './components/FileTree';
 import Editor from './components/editor/Editor';
 import { htmlToMarkdown } from './components/editor/converters';
 import SettingsDialog from './components/SettingsDialog';
+import AboutDialog from './components/AboutDialog';
 import PanelResizer from './components/PanelResizer';
 import TabBar from './components/TabBar';
 import StatusBar from './components/StatusBar';
@@ -67,6 +68,7 @@ function App() {
     });
 
     const [showSettings, setShowSettings] = React.useState(false);
+    const [showAbout, setShowAbout] = React.useState(false);
     const [wrap, setWrap] = React.useState(true);
     const [leftPanelWidth, setLeftPanelWidth] = React.useState(() => {
         if (typeof window === 'undefined') return 260;
@@ -214,6 +216,17 @@ function App() {
                     break;
                 case 'open-settings':
                     setShowSettings(true);
+                    break;
+                case 'show-about':
+                    setShowAbout(true);
+                    break;
+                case 'deactivate-license':
+                    if (window.confirm('Deactivate your license? The app will restart.')) {
+                        window.api.deactivateLicense().then(() => window.location.reload());
+                    }
+                    break;
+                case 'check-updates':
+                    setStatus('Checking for updates...');
                     break;
                 case 'toggle-lint':
                     setLintEnabled(!lintEnabled);
@@ -1146,6 +1159,13 @@ function App() {
                     settings={settings}
                     onCancel={() => setShowSettings(false)}
                     onSave={handleSettingsSave}
+                />
+            ) : null}
+            {showAbout ? (
+                <AboutDialog
+                    onClose={() => setShowAbout(false)}
+                    licenseInfo={licenseInfo}
+                    version="1.0.0"
                 />
             ) : null}
         </div>
