@@ -237,6 +237,8 @@ function createWindow() {
     } else {
         mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
     }
+
+    mainWindow.setTitle(`Fiction Linter Desktop v${app.getVersion()}`);
 }
 
 app.whenReady().then(() => {
