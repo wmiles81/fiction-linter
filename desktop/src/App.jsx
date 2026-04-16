@@ -10,6 +10,7 @@ import PanelResizer from './components/PanelResizer';
 import TabBar from './components/TabBar';
 import StatusBar from './components/StatusBar';
 import ThemePicker from './components/ThemePicker';
+import LicenseDialog from './components/LicenseDialog';
 import { getFileKind } from './lib/fileEligibility';
 import { useAppStore } from './store/useAppStore';
 import { useEditorStore } from './store/useEditorStore';
@@ -53,6 +54,9 @@ function App() {
     const setScanProgress = useLintStore(state => state.setScanProgress);
     const setLintEnabled = useLintStore(state => state.setEnabled);
     const setShowFindings = useLintStore(state => state.setShowFindings);
+
+    const [licenseState, setLicenseState] = React.useState('checking'); // 'checking' | 'licensed' | 'unlicensed'
+    const [licenseInfo, setLicenseInfo] = React.useState(null);
 
     const [editorState, setEditorState] = React.useState({
         line: 1,
@@ -102,6 +106,31 @@ function App() {
     useEffect(() => {
         hydrate();
     }, [hydrate]);
+
+    useEffect(() => {
+        (async () => {
+            try {
+                const info = await window.api.getLicenseInfo();
+                if (info.licensed) {
+                    if (info.needsRevalidation) {
+                        const result = await window.api.revalidateLicense();
+                        if (!result.valid) {
+                            setLicenseState('unlicensed');
+                            return;
+                        }
+                    }
+                    setLicenseInfo({ email: info.email, name: info.name });
+                    setLicenseState('licensed');
+                } else {
+                    setLicenseState('unlicensed');
+                }
+            } catch {
+                // If license check fails entirely, let the user in — don't lock them
+                // out because of a bug in the licensing code.
+                setLicenseState('licensed');
+            }
+        })();
+    }, []);
 
     // Paint the persisted theme onto <html data-theme> as soon as React
     // mounts. The store constructor already reads localStorage synchronously
@@ -904,6 +933,22 @@ function App() {
     );
     const visibleIssues = showFindings ? mergedIssues : [];
 
+    if (licenseState === 'checking') {
+        return null; // brief flash before license check completes
+    }
+
+    if (licenseState === 'unlicensed') {
+        return (
+            <LicenseDialog
+                onActivated={(info) => {
+                    setLicenseInfo(info);
+                    setLicenseState('licensed');
+                }}
+            />
+        );
+    }
+
+    // licenseState === 'licensed' — render the full app below
     return (
         <div className="app-shell">
             <header className="top-bar">
