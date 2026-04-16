@@ -1828,3 +1828,9 @@ body {
 .help-popup-more:hover {
     text-decoration: underline;
 }
+
+/* When the popup would clip the top of the viewport, flip it below
+   the anchor instead of above. */
+.help-popup.flipped {
+    transform: translate(-50%, 16px);
+}
