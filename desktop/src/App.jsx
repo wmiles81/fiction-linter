@@ -264,6 +264,49 @@ function App() {
         return () => clearTimeout(handle);
     }, [lintEnabled, content, speData, patternCore, nameCore, settings, setIssues]);
 
+    // Restore AI findings from the sidecar `.findings.json` when the
+    // active tab changes (including initial hydrate on app start). Pattern
+    // findings regenerate via the auto-lint effect, but AI findings are
+    // produced only by an explicit scan — without this restore, closing
+    // and reopening the app loses a 2-minute scan. Clears aiIssues first
+    // so stale findings from the *previous* tab don't bleed through.
+    useEffect(() => {
+        // Clear immediately so there's no visual flash of the wrong tab's
+        // AI findings while the read is in flight.
+        setAiIssues([]);
+        if (!activeTab?.path) return;
+        let cancelled = false;
+        (async () => {
+            try {
+                const result = await window.api.readFindings(activeTab.path);
+                if (cancelled || !result?.ok || !result.payload) return;
+                // Restore only AI-sourced findings. Pattern findings arrive
+                // via the auto-lint effect within 300ms — merging them from
+                // the sidecar would cause a double-count until that effect
+                // re-runs and overwrites `issues`.
+                const aiFindings = (result.payload.findings || [])
+                    .filter(f => f.source === 'ai')
+                    .map(f => ({
+                        start: f.offset?.start ?? 0,
+                        end: f.offset?.end ?? 0,
+                        text: f.text || '',
+                        message: f.message || '',
+                        severity: f.severity || 'info',
+                        category: f.category || 'unknown',
+                        source: 'ai',
+                        line: f.line || 1
+                    }));
+                if (!cancelled && aiFindings.length > 0) {
+                    setAiIssues(aiFindings);
+                }
+            } catch {
+                // Sidecar missing or corrupt — non-fatal, user can re-scan.
+            }
+        })();
+        return () => { cancelled = true; };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [activeTabId]);
+
     // Drop stale AI findings whenever content changes. An AI finding is
     // stale when the text at its offsets no longer matches the substring
     // the AI flagged — pattern findings regenerate on each lint, but AI

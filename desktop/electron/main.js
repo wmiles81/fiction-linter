@@ -402,6 +402,26 @@ ipcMain.handle('findings:write', async (_event, requestPayload) => {
     }
 });
 
+// Read the findings sidecar for a document. Returns the parsed JSON
+// payload so the renderer can restore AI findings on tab switch / app
+// restart instead of forcing the user to re-run the scan.
+ipcMain.handle('findings:read', async (_event, sourcePath) => {
+    if (!sourcePath || typeof sourcePath !== 'string') {
+        return { ok: false, error: 'Missing sourcePath.' };
+    }
+    const findingsPath = `${sourcePath}.findings.json`;
+    if (!fs.existsSync(findingsPath)) {
+        return { ok: false, error: 'No findings file.' };
+    }
+    try {
+        const raw = fs.readFileSync(findingsPath, 'utf8');
+        const payload = JSON.parse(raw);
+        return { ok: true, payload };
+    } catch (error) {
+        return { ok: false, error: error.message };
+    }
+});
+
 // Read a .docx file as binary, run mammoth to convert to HTML. The renderer
 // then converts that HTML to markdown via the existing editor/converters.js
 // `htmlToMarkdown` (the same pipeline as paste handling), so .docx import
