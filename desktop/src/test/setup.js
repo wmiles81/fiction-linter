@@ -41,5 +41,8 @@ if (typeof window !== 'undefined' && !window.api) {
         onMenuAction: (_cb) => () => {},
         onUpdateReady: (_cb) => () => {},
         installUpdate: async () => {},
+        loadHelp: async () => ([
+            { id: 'test-topic', title: 'Test', category: 'Test', order: 1, summary: 'A test.', keywords: [], body: '## Test\n\nBody.' }
+        ]),
     };
 }

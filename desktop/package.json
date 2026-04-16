@@ -62,6 +62,7 @@
     "files": [
       "electron/**/*",
       "dist/**/*",
+      "help/**/*",
       "package.json"
     ],
     "extraResources": [

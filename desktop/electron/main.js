@@ -9,6 +9,7 @@ const { buildExplainMessages, buildRewriteMessages, buildScanMessages } = requir
 const { getDefaultSpePath: resolveDefaultSpePath } = require('./spePath');
 const { installMenu } = require('./menu');
 const { readStoredLicense, storeLicense, clearLicense, shouldRevalidate, validateLicenseKey } = require('./licensing');
+const { loadHelpIndex } = require('./helpLoader');
 
 let mainWindow = null;
 
@@ -824,4 +825,11 @@ ipcMain.handle('ai:scan', async (_event, payload) => {
 ipcMain.handle('update:install', async () => {
     const { installUpdate } = require('./updater');
     installUpdate();
+});
+
+ipcMain.handle('help:load', async () => {
+    const helpDir = app.isPackaged
+        ? path.join(process.resourcesPath, 'help')
+        : path.join(__dirname, '..', 'help');
+    return loadHelpIndex(helpDir);
 });
