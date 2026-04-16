@@ -3,7 +3,7 @@ id: format-bold-italic-underline
 title: Bold, Italic, Underline
 category: Format Bar
 order: 4
-summary: Applies inline bold, italic, or underline formatting to selected text. Keyboard shortcuts: Cmd+B, Cmd+I, Cmd+U (Mac) or Ctrl+B, Ctrl+I, Ctrl+U (Windows/Linux).
+summary: "Applies inline bold, italic, or underline formatting to selected text. Use Cmd+B, Cmd+I, Cmd+U (Mac) or Ctrl+B, Ctrl+I, Ctrl+U (Windows/Linux)."
 keywords: bold, italic, underline, inline, formatting, emphasis, cmd+b, cmd+i, cmd+u, ctrl+b
 ---
 
