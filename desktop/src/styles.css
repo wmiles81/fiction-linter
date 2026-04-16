@@ -1493,3 +1493,88 @@ body {
     text-decoration: underline wavy #48a;
     text-decoration-skip-ink: none;
 }
+
+/* License dialog — blocks app until valid key entered */
+.license-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: grid;
+    place-items: center;
+    background: radial-gradient(circle at top left, var(--bg-2), var(--bg-1) 55%, var(--bg-3) 100%);
+}
+
+.license-card {
+    width: 400px;
+    max-width: 90vw;
+    padding: 40px;
+    background: var(--surface-strong, #ffffff);
+    border: 1px solid var(--border, #d3d5da);
+    border-radius: 16px;
+    box-shadow: var(--shadow);
+    text-align: center;
+}
+
+.license-title {
+    font-family: 'Fraunces', serif;
+    font-size: 28px;
+    margin: 0 0 4px;
+    color: var(--ink);
+}
+
+.license-subtitle {
+    font-size: 14px;
+    color: var(--muted);
+    margin: 0 0 4px;
+}
+
+.license-publisher {
+    font-size: 12px;
+    color: var(--muted);
+    margin: 0 0 28px;
+    opacity: 0.7;
+}
+
+.license-form {
+    text-align: left;
+    margin-bottom: 20px;
+}
+
+.license-form label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 6px;
+    color: var(--ink);
+}
+
+.license-form input {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-family: 'SF Mono', 'Menlo', monospace;
+    font-size: 14px;
+    letter-spacing: 0.05em;
+    color: var(--ink);
+    background: var(--surface-strong);
+    box-sizing: border-box;
+}
+
+.license-form input:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent);
+}
+
+.license-error {
+    margin-top: 8px;
+    font-size: 13px;
+    color: var(--g-danger, #b33a3a);
+}
+
+.license-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
