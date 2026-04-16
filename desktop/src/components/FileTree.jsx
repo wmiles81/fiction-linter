@@ -28,6 +28,13 @@ function FileTree({ nodes, onToggle, onSelect, selectedPath }) {
 
 function TreeNode({ node, onToggle, onSelect, selectedPath, depth }) {
     const isSelected = selectedPath === node.path;
+    // A directory is an "ancestor" of the selected file when the selected
+    // path starts with this directory's path followed by a separator.
+    // Highlighting ancestors gives a visual breadcrumb trail from the root
+    // down to the active file — standard file-tree convention (Finder,
+    // VS Code, JetBrains all do this).
+    const isAncestor = node.isDirectory && selectedPath &&
+        selectedPath.startsWith(node.path + '/');
     const indent = { paddingLeft: `${depth * 16 + 12}px` };
     const eligible = node.isDirectory || isFileEligible(node.name);
     const disabled = !eligible && !node.isDirectory;
@@ -44,7 +51,7 @@ function TreeNode({ node, onToggle, onSelect, selectedPath, depth }) {
     return (
         <div className="tree-node">
             <button
-                className={`tree-row ${isSelected ? 'selected' : ''} ${disabled ? 'disabled' : ''}`}
+                className={`tree-row ${isSelected ? 'selected' : ''} ${isAncestor ? 'ancestor' : ''} ${disabled ? 'disabled' : ''}`}
                 style={indent}
                 onClick={handleClick}
                 disabled={disabled}

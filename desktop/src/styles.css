@@ -600,6 +600,15 @@ body {
     font-weight: 600;
 }
 
+/* Ancestor directories of the selected file get a subtle breadcrumb
+   highlight so the user can trace the path from root to the active doc.
+   Lighter than .selected so the active file stays visually dominant. */
+.tree-row.ancestor {
+    background: rgba(0, 0, 0, 0.04);
+    font-weight: 600;
+    color: var(--accent-2, #2f6f86);
+}
+
 .tree-row.disabled {
     opacity: 0.4;
     cursor: not-allowed;

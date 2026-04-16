@@ -321,9 +321,17 @@ function App() {
     useEffect(() => {
         if (aiIssues.length === 0) return;
         const handle = setTimeout(() => {
-            const plain = editorRef.current?.getPlainText?.() || content;
+            // ONLY validate against the editor's plain-text representation.
+            // Falling back to `content` (markdown) would use the wrong
+            // coordinate system — markdown has **bold** markers, # headings,
+            // etc. that shift offsets relative to the rendered text. On app
+            // startup the editor hasn't rendered yet and getPlainText()
+            // returns undefined; in that case SKIP the check entirely
+            // rather than wiping out every just-restored AI finding.
+            const plain = editorRef.current?.getPlainText?.();
+            if (!plain) return;
             const fresh = aiIssues.filter(i => {
-                if (!i.text) return true; // legacy finding without expected text — trust it
+                if (!i.text) return true;
                 return plain.slice(i.start, i.end) === i.text;
             });
             if (fresh.length !== aiIssues.length) {
