@@ -14,7 +14,8 @@
     "dist:mac": "npm run build && electron-builder --mac",
     "dist:win": "npm run build && electron-builder --win",
     "dist:linux": "npm run build && electron-builder --linux",
-    "dist:all": "npm run build && electron-builder --mac --win --linux"
+    "dist:all": "npm run build && electron-builder --mac --win --linux",
+    "build:manual": "node scripts/build-manual.js"
   },
   "dependencies": {
     "@codemirror/lang-markdown": "^6.5.0",
