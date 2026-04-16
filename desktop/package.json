@@ -10,7 +10,11 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "dist": "npm run build && electron-builder --mac"
+    "dist": "npm run build && electron-builder --mac",
+    "dist:mac": "npm run build && electron-builder --mac",
+    "dist:win": "npm run build && electron-builder --win",
+    "dist:linux": "npm run build && electron-builder --linux",
+    "dist:all": "npm run build && electron-builder --mac --win --linux"
   },
   "dependencies": {
     "@codemirror/lang-markdown": "^6.5.0",
@@ -85,7 +89,27 @@
           ]
         }
       ],
+      "icon": "build/icon.icns",
       "identity": null
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Office",
+      "icon": "build/icon.png"
     }
   }
 }
