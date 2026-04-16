@@ -1027,6 +1027,7 @@ function App() {
         <div className="app-shell">
             <header className="top-bar">
                 <div className="brand">
+                    <img src="/icon.png" alt="" className="brand-icon" />
                     <span className="brand-title">Fiction Linter</span>
                     <span className="brand-tag">Desktop Studio</span>
                 </div>

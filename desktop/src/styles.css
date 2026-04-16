@@ -244,6 +244,19 @@ body {
     line-height: 1;
 }
 
+.brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.brand-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    flex-shrink: 0;
+}
+
 .brand-title {
     font-family: 'Fraunces', serif;
     font-size: 26px;
