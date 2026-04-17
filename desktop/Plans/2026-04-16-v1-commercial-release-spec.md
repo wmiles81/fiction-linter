@@ -71,8 +71,8 @@ App launches
     "encryptedKey": "<base64>",
     "productId": "fiction-linter",
     "validatedAt": "2026-04-16T00:00:00.000Z",
-    "licenseeEmail": "user@example.com",
-    "licenseeName": "Jane Author"
+    "email": "user@example.com",
+    "name": "Author Name"
   }
   ```
 - `validatedAt` is updated on each successful API check. If > 30 days stale, re-validate on next launch. This lets the app work fully offline between checks.
