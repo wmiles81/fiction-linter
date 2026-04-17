@@ -38,17 +38,17 @@ function StatusBar({
             </div>
 
             <div className="status-bar-right">
-                <span className="status-bar-metric">{wordCount} words</span>
-                <span className="status-bar-metric">{charCount} chars</span>
+                <span className="status-bar-metric" data-help-id="status-word-char-counts">{wordCount} words</span>
+                <span className="status-bar-metric" data-help-id="status-word-char-counts">{charCount} chars</span>
                 {hasSelection ? (
                     <span className="status-bar-metric status-bar-selection">
                         {selection.words} words selected {'\u00B7'} {selection.chars} chars selected
                     </span>
                 ) : null}
                 {cursorLine && cursorColumn ? (
-                    <span className="status-bar-metric">Ln {cursorLine}:{cursorColumn}</span>
+                    <span className="status-bar-metric" data-help-id="status-cursor-position">Ln {cursorLine}:{cursorColumn}</span>
                 ) : null}
-                <span className="status-bar-metric">{issueCount} findings</span>
+                <span className="status-bar-metric" data-help-id="status-findings-count">{issueCount} findings</span>
             </div>
         </footer>
     );

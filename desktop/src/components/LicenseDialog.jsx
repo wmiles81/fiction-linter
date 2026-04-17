@@ -54,6 +54,7 @@ function LicenseDialog({ onActivated }) {
     return (
         <div className="license-backdrop">
             <div className="license-card">
+                <img src="/icon.png" alt="Fiction Linter" className="license-logo" />
                 <h1 className="license-title">Fiction Linter</h1>
                 <p className="license-subtitle">Desktop Studio</p>
                 <p className="license-publisher">Ocotillo Quill Press LLC</p>

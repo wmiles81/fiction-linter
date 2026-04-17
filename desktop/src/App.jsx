@@ -1131,7 +1131,9 @@ function App() {
                             <line x1="12" y1="17" x2="12.01" y2="17" />
                         </svg>
                     </button>
-                    <ThemePicker data-help-id="themes-overview" />
+                    <div data-help-id="themes-overview">
+                        <ThemePicker />
+                    </div>
                     <button
                         className="icon-button"
                         data-help-id="settings-overview"

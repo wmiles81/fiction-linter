@@ -9,6 +9,22 @@ const HELP_DIR = path.join(__dirname, '..', 'help');
 const OUT_DIR = path.join(__dirname, '..', 'manual');
 const VERSION = require('../package.json').version;
 
+// Embed the logo as a base64 data URI so the manual is fully self-contained.
+// Uses the 64px retina version from public/ (not the full 2048px source).
+function loadLogoDataUri() {
+    const candidates = [
+        path.join(__dirname, '..', 'public', 'icon.png'),
+        path.join(__dirname, '..', 'build', 'icon.png')
+    ];
+    for (const p of candidates) {
+        if (fs.existsSync(p)) {
+            const buf = fs.readFileSync(p);
+            return `data:image/png;base64,${buf.toString('base64')}`;
+        }
+    }
+    return null;
+}
+
 async function renderMarkdown(md) {
     const { unified } = await import('unified');
     const remarkParse = (await import('remark-parse')).default;
@@ -49,6 +65,8 @@ async function main() {
     }
     toc += '</ul></nav>';
 
+    const logoUri = loadLogoDataUri();
+
     // Build content HTML (render each topic's body)
     let content = '';
     for (const [cat, catTopics] of grouped) {
@@ -71,6 +89,7 @@ async function main() {
 /* Parchment-inspired manual styling */
 body { font-family: Georgia, 'Times New Roman', serif; max-width: 800px; margin: 0 auto; padding: 40px 24px; color: #2a2620; line-height: 1.7; background: #faf7f0; }
 header { text-align: center; margin-bottom: 40px; padding-bottom: 20px; border-bottom: 2px solid #d7d2c5; }
+.header-logo { width: 80px; height: 80px; border-radius: 16px; margin-bottom: 12px; }
 h1 { font-size: 32px; margin: 0 0 4px; color: #1c1b19; }
 .version { color: #6b655b; font-size: 14px; margin: 0 0 4px; }
 .publisher { color: #6b655b; font-size: 13px; }
@@ -98,6 +117,7 @@ strong { color: #1c1b19; }
 </head>
 <body>
 <header>
+${logoUri ? `<img src="${logoUri}" alt="Fiction Linter" class="header-logo" />` : ''}
 <h1>Fiction Linter Desktop</h1>
 <p class="version">User Manual — v${VERSION}</p>
 <p class="publisher">Ocotillo Quill Press LLC</p>

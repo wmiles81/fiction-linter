@@ -26,6 +26,7 @@ function EditorToolbar({
         <div className="editor-toolbar" role="toolbar" aria-label="Editor toolbar">
             <button
                 type="button"
+                data-help-id="format-save"
                 onClick={onSave}
                 disabled={!canSave}
                 title="Save (Cmd+S)"
@@ -38,6 +39,7 @@ function EditorToolbar({
 
             <button
                 type="button"
+                data-help-id="format-undo-redo"
                 onClick={fire('undo')}
                 disabled={!canUndo}
                 title="Undo (Cmd+Z)"
@@ -47,6 +49,7 @@ function EditorToolbar({
             </button>
             <button
                 type="button"
+                data-help-id="format-undo-redo"
                 onClick={fire('redo')}
                 disabled={!canRedo}
                 title="Redo (Cmd+Shift+Z)"
@@ -58,6 +61,7 @@ function EditorToolbar({
             <div className="editor-toolbar-separator" />
 
             <select
+                data-help-id="format-paragraph-style"
                 onChange={(e) => onCommand?.({ kind: 'format-block', value: e.target.value })}
                 aria-label="Paragraph style"
                 className="paragraph-style-select"
@@ -73,6 +77,7 @@ function EditorToolbar({
 
             <button
                 type="button"
+                data-help-id="format-bold-italic-underline"
                 onClick={fire('bold')}
                 title="Bold (Cmd+B)"
                 aria-label="Bold"
@@ -82,6 +87,7 @@ function EditorToolbar({
             </button>
             <button
                 type="button"
+                data-help-id="format-bold-italic-underline"
                 onClick={fire('italic')}
                 title="Italic (Cmd+I)"
                 aria-label="Italic"
@@ -91,6 +97,7 @@ function EditorToolbar({
             </button>
             <button
                 type="button"
+                data-help-id="format-bold-italic-underline"
                 onClick={fire('underline')}
                 title="Underline (Cmd+U)"
                 aria-label="Underline"
@@ -103,6 +110,7 @@ function EditorToolbar({
 
             <button
                 type="button"
+                data-help-id="format-scene-break"
                 onClick={fire('scene-break')}
                 title="Insert scene break"
                 aria-label="Scene break"
@@ -113,7 +121,7 @@ function EditorToolbar({
             <div className="editor-toolbar-spacer" />
 
             {canShowFontControls ? (
-                <div className="editor-fontsize" role="group" aria-label="Editor font size">
+                <div className="editor-fontsize" role="group" aria-label="Editor font size" data-help-id="format-font-size">
                     <button
                         type="button"
                         onClick={() => onChangeFontSize(editorFontSize - FONT_SIZE_STEP)}
@@ -150,6 +158,7 @@ function EditorToolbar({
                 title={wrap ? 'Disable soft wrap' : 'Enable soft wrap'}
                 aria-label={`Toggle wrap (currently ${wrap ? 'on' : 'off'})`}
                 className={`toolbar-toggle ${wrap ? 'on' : 'off'}`}
+                data-help-id="format-wrap"
             >
                 Wrap
             </button>

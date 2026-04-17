@@ -1528,6 +1528,13 @@ body {
     text-align: center;
 }
 
+.license-logo {
+    width: 64px;
+    height: 64px;
+    border-radius: 12px;
+    margin-bottom: 16px;
+}
+
 .license-title {
     font-family: 'Fraunces', serif;
     font-size: 28px;
