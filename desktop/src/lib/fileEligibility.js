@@ -10,8 +10,9 @@
  *   - .docx → read as binary, run through mammoth → HTML → htmlToMarkdown,
  *             open as a tab with a sibling `.md` path so save writes to .md
  *             without overwriting the original .docx
- *   - .gdoc → read JSON pointer, extract URL, open in default browser via
- *             shell.openExternal (no actual content available offline)
+ *   - .gdoc → parse JSON pointer, fetch HTML export from Google Docs API via
+ *             Electron net.request (with Google sign-in if needed), convert
+ *             HTML → markdown via unified, open as a tab with a sibling .md path
  *
  * `getFileKind(fileName)` returns the routing tag so the App layer can
  * dispatch on it without re-implementing extension matching.
@@ -38,7 +39,7 @@ export function isFileEligible(fileName) {
  *
  * - 'text': plain text file (markdown, txt) — read as UTF-8 via fs:readFile
  * - 'docx': Word document — read as binary via fs:readDocx, convert via mammoth
- * - 'gdoc': Google Docs pointer file — read via fs:readGdoc, open URL externally
+ * - 'gdoc': Google Docs pointer file — imported via fs:readGdoc, converted to markdown in-app
  * - null:   not openable
  */
 export function getFileKind(fileName) {

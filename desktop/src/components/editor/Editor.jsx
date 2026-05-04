@@ -37,9 +37,12 @@ const Editor = forwardRef(function Editor({
     onToggleWrap,
     onFixLater,
     onFixNow,
+    onSuggestFixes,
+    onApplySuggestedFix,
     showLineNumbers,
     editorFontSize,
-    onChangeFontSize
+    onChangeFontSize,
+    onContentReady
 }, ref) {
     const editorRef = useRef(null);
     const gutterInnerRef = useRef(null);
@@ -63,6 +66,7 @@ const Editor = forwardRef(function Editor({
     // Track in-flight fix so the buttons can show "Fixing…" and avoid
     // double-clicks during the AI rewrite round-trip.
     const [fixInFlight, setFixInFlight] = useState(false);
+    const [suggestedFixes, setSuggestedFixes] = useState(null);
 
     // Hover-tooltip state for inline lint warnings.
     // hoverFinding is the finding currently under the cursor (or null).
@@ -71,6 +75,32 @@ const Editor = forwardRef(function Editor({
     const [hoverFinding, setHoverFinding] = useState(null);
     const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
     const hoverRafRef = useRef(null);
+    // Mirrors of issues/showFindings kept in refs so the async content effect
+    // can re-apply highlights right after it writes innerHTML, without taking
+    // a closure over the stale values from the last render.
+    const latestIssuesRef = useRef(issues);
+    const latestShowFindingsRef = useRef(showFindings);
+    useEffect(() => { latestIssuesRef.current = issues; }, [issues]);
+    useEffect(() => { latestShowFindingsRef.current = showFindings; }, [showFindings]);
+    // Keep a ref to onContentReady so the async innerHTML callback always
+    // calls the latest version (avoids stale closure over the prop).
+    const onContentReadyRef = useRef(onContentReady);
+    useEffect(() => { onContentReadyRef.current = onContentReady; }, [onContentReady]);
+    // Mirror suggestedFixes in a ref so the stable scheduleHideTooltip
+    // useCallback can read the latest value without a stale closure.
+    const suggestedFixesRef = useRef(suggestedFixes);
+    useEffect(() => { suggestedFixesRef.current = suggestedFixes; }, [suggestedFixes]);
+
+    useEffect(() => {
+        if (!hoverFinding) {
+            setSuggestedFixes(null);
+            return;
+        }
+        const key = `${hoverFinding.start}-${hoverFinding.end}-${hoverFinding.source}`;
+        if (suggestedFixes?.forKey && suggestedFixes.forKey !== key) {
+            setSuggestedFixes(null);
+        }
+    }, [hoverFinding, suggestedFixes]);
 
     // Sync external value (markdown) into the contenteditable as HTML
     useEffect(() => {
@@ -87,9 +117,25 @@ const Editor = forwardRef(function Editor({
                 editorRef.current.innerHTML = clean;
             }
             isSettingContentRef.current = false;
+            // Re-apply any already-computed highlights immediately (handles
+            // the case where the lint fired before markdownToHtml resolved
+            // and the DOM was still populated from a previous file).
+            applyLintHighlights(
+                editorRef.current,
+                latestShowFindingsRef.current ? latestIssuesRef.current : [],
+                latestShowFindingsRef.current
+            );
+            // Re-run lint against the freshly-populated DOM. This is the
+            // critical fix for large gdoc imports: their markdownToHtml
+            // conversion takes >300ms, so the debounced lint fires while
+            // the DOM is empty, falls back to raw markdown text, and
+            // computes wrong-offset issues. Calling onContentReady here
+            // runs lint now that getPlainText() returns the real plain text.
+            onContentReadyRef.current?.();
         });
         return () => {
             cancelled = true;
+            isSettingContentRef.current = false;
         };
     }, [value]);
 
@@ -172,6 +218,7 @@ const Editor = forwardRef(function Editor({
     // them in their useCallback dependency arrays — const is subject to
     // the Temporal Dead Zone.
     const scheduleHideTooltip = useCallback(() => {
+        if (suggestedFixesRef.current !== null) return;
         if (tooltipHideTimerRef.current) clearTimeout(tooltipHideTimerRef.current);
         tooltipHideTimerRef.current = setTimeout(() => {
             tooltipHideTimerRef.current = null;
@@ -461,6 +508,7 @@ const Editor = forwardRef(function Editor({
                 <div
                     ref={editorRef}
                     className={`editor-surface ${wrap ? 'wrap' : ''} ${showLineNumbers ? 'with-line-numbers' : ''}`}
+                    style={editorFontSize ? { fontSize: `${editorFontSize}px` } : undefined}
                     contentEditable
                     suppressContentEditableWarning
                     onInput={handleInput}
@@ -483,7 +531,7 @@ const Editor = forwardRef(function Editor({
                     onMouseLeave={scheduleHideTooltip}
                 >
                     <div className="lint-tooltip-message">{hoverFinding.message}</div>
-                    {(onFixLater || onFixNow) ? (
+                    {(onFixLater || onFixNow || onSuggestFixes) ? (
                         <div className="lint-tooltip-actions">
                             {onFixNow ? (
                                 <button
@@ -497,6 +545,7 @@ const Editor = forwardRef(function Editor({
                                             await onFixNow(hoverFinding);
                                         } finally {
                                             setFixInFlight(false);
+                                            setSuggestedFixes(null);
                                             setHoverFinding(null);
                                         }
                                     }}
@@ -512,11 +561,95 @@ const Editor = forwardRef(function Editor({
                                     onClick={async () => {
                                         if (!onFixLater) return;
                                         await onFixLater(hoverFinding);
+                                        setSuggestedFixes(null);
                                         setHoverFinding(null);
                                     }}
                                 >
                                     Fix later
                                 </button>
+                            ) : null}
+                        </div>
+                    ) : null}
+                    {onSuggestFixes ? (
+                        <div className="lint-tooltip-suggestions">
+                            <div className="lint-tooltip-suggestions-header">
+                                <span>Suggested fixes</span>
+                                {(suggestedFixes?.options?.length || suggestedFixes?.error) ? (
+                                    <button
+                                        type="button"
+                                        className="lint-tooltip-link"
+                                        onClick={() => setSuggestedFixes(null)}
+                                    >
+                                        Reject
+                                    </button>
+                                ) : null}
+                            </div>
+                            {suggestedFixes?.loading ? (
+                                <div className="lint-tooltip-suggestions-status">Loading…</div>
+                            ) : null}
+                            {suggestedFixes?.error ? (
+                                <div className="lint-tooltip-suggestions-status error">
+                                    {suggestedFixes.error}
+                                </div>
+                            ) : null}
+                            {(!suggestedFixes || (!suggestedFixes.loading && !suggestedFixes.options?.length && !suggestedFixes.error)) ? (
+                                <button
+                                    type="button"
+                                    className="lint-tooltip-btn"
+                                    disabled={fixInFlight}
+                                    onClick={async () => {
+                                        if (!onSuggestFixes || fixInFlight) return;
+                                        const key = `${hoverFinding.start}-${hoverFinding.end}-${hoverFinding.source}`;
+                                        setSuggestedFixes({ forKey: key, options: [], loading: true, error: null });
+                                        const result = await onSuggestFixes(hoverFinding);
+                                        if (!result?.ok) {
+                                            setSuggestedFixes({
+                                                forKey: key,
+                                                options: [],
+                                                loading: false,
+                                                error: result?.error || 'Unable to fetch suggestions.'
+                                            });
+                                            return;
+                                        }
+                                        const options = Array.isArray(result.options)
+                                            ? result.options.slice(0, 3)
+                                            : [];
+                                        setSuggestedFixes({
+                                            forKey: key,
+                                            options,
+                                            loading: false,
+                                            error: options.length ? null : 'No usable suggestions returned.'
+                                        });
+                                    }}
+                                >
+                                    Suggested fixes
+                                </button>
+                            ) : null}
+                            {suggestedFixes?.options?.length ? (
+                                <ol className="lint-tooltip-suggestions-list">
+                                    {suggestedFixes.options.map((option, idx) => (
+                                        <li key={`${hoverFinding.start}-${hoverFinding.end}-${idx}`}>
+                                            <button
+                                                type="button"
+                                                className="lint-tooltip-suggestion-btn"
+                                                disabled={fixInFlight}
+                                                onClick={async () => {
+                                                    if (!onApplySuggestedFix || fixInFlight) return;
+                                                    setFixInFlight(true);
+                                                    try {
+                                                        await onApplySuggestedFix(hoverFinding, option);
+                                                    } finally {
+                                                        setFixInFlight(false);
+                                                        setSuggestedFixes(null);
+                                                        setHoverFinding(null);
+                                                    }
+                                                }}
+                                            >
+                                                {option}
+                                            </button>
+                                        </li>
+                                    ))}
+                                </ol>
                             ) : null}
                         </div>
                     ) : null}

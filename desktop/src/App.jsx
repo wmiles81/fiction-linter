@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import { PatternLinterCore, NameValidatorCore } from '@shared/linting';
 import { scanDocument, findNextIssue } from './lib/aiScanner';
 import { buildFindingsPayload } from './lib/findingsFile';
@@ -328,43 +328,34 @@ function App() {
         });
     }, [settings?.spePath, setSpeData, setStatus]);
 
+    // Extracted so Editor can call this immediately after innerHTML is set,
+    // bypassing the 300ms debounce. Without this, gdoc imports (where
+    // markdownToHtml takes >300ms for large docs) have the debounce fire
+    // while the DOM is still empty, fall back to raw markdown text for
+    // offset computation, and produce highlights at wrong positions.
+    const runLintNow = useCallback(() => {
+        if (!lintEnabled || !content || !settings) return;
+        const domText = editorRef.current?.getPlainText?.();
+        const lintInput = domText || content;
+        const findings = [
+            ...patternCore.lintText(lintInput, speData),
+            ...nameCore.lintText(lintInput, speData)
+        ];
+        const mapped = findings.map(finding => {
+            const loc = indexToLineCol(lintInput, finding.start);
+            return { ...finding, line: loc.line, column: loc.column };
+        });
+        setIssues(mapped);
+    }, [lintEnabled, content, speData, patternCore, nameCore, settings, setIssues]);
+
     useEffect(() => {
         if (!lintEnabled || !content || !settings) {
             setIssues([]);
             return;
         }
-
-        const handle = setTimeout(() => {
-            // Lint against the editor's PLAIN TEXT representation (the same
-            // string lintOverlay uses for offset mapping), NOT the markdown
-            // source. Markdown syntax markers (**, #, etc.) shift offsets
-            // relative to the rendered text — feeding markdown offsets into
-            // the DOM-based highlight overlay produces wrong-position
-            // highlights and crashes the Range API on out-of-bounds offsets.
-            //
-            // Falls back to `content` (the markdown) if the editor is not
-            // mounted yet — only matters on the very first lint cycle.
-            const lintInput = editorRef.current?.getPlainText?.() || content;
-
-            const findings = [
-                ...patternCore.lintText(lintInput, speData),
-                ...nameCore.lintText(lintInput, speData)
-            ];
-
-            const mapped = findings.map(finding => {
-                const loc = indexToLineCol(lintInput, finding.start);
-                return {
-                    ...finding,
-                    line: loc.line,
-                    column: loc.column
-                };
-            });
-
-            setIssues(mapped);
-        }, 300);
-
+        const handle = setTimeout(runLintNow, 300);
         return () => clearTimeout(handle);
-    }, [lintEnabled, content, speData, patternCore, nameCore, settings, setIssues]);
+    }, [lintEnabled, content, speData, patternCore, nameCore, settings, runLintNow, setIssues]);
 
     // Restore AI findings from the sidecar `.findings.json` when the
     // active tab changes (including initial hydrate on app start). Pattern
@@ -714,6 +705,50 @@ function App() {
         };
     };
 
+    const getRewriteContext = (finding) => {
+        const plain = editorRef.current?.getPlainText?.() || content;
+        const original = plain.slice(finding.start, finding.end);
+
+        // Staleness guard: if the finding carries its expected flagged text
+        // and the text at those offsets no longer matches, the document has
+        // been edited since the scan and the offsets are wrong. Applying
+        // the replacement would corrupt the document ("LiLike" bug). Refuse
+        // the fix with a clear message.
+        if (finding.text && original !== finding.text) {
+            setStatus(
+                `Finding is stale — the document has changed since the scan. ` +
+                `Expected "${finding.text}" but offsets now point to "${original}". ` +
+                `Re-run the AI scan to refresh findings.`
+            );
+            return null;
+        }
+
+        const snippetStart = Math.max(0, finding.start - 80);
+        const snippetEnd = Math.min(plain.length, finding.end + 80);
+        const snippet = plain.slice(snippetStart, snippetEnd);
+
+        return { plain, original, snippet };
+    };
+
+    const applyRewriteReplacement = async (finding, context, replacement, note) => {
+        const { plain, original } = context;
+        const before = plain.slice(0, finding.start);
+        const after = plain.slice(finding.end);
+        const newMarkdown = before + replacement + after;
+        updateContent(newMarkdown);
+
+        const delta = replacement.length - original.length;
+        const nextAiIssues = aiIssues
+            .filter(i => !(i.start === finding.start && i.end === finding.end && i.source === finding.source))
+            .map(i => (i.start > finding.start)
+                ? { ...i, start: i.start + delta, end: i.end + delta }
+                : i);
+        setAiIssues(nextAiIssues);
+
+        await window.api.appendAnnotation(activeTab.path, buildFindingEntry(finding, note));
+        setStatus(`Fix applied and logged. ${activeTab.path}.annotation.md`);
+    };
+
     // Fix later: log the original text + the finding message to the sibling
     // annotation file and leave the editor untouched. The user can later
     // feed the pair (source + annotation) to another AI for rewrites.
@@ -735,6 +770,52 @@ function App() {
         }
     };
 
+    const handleSuggestFixes = async (finding) => {
+        if (!activeTab?.path) {
+            setStatus('Save the document first — suggested fixes need a sibling annotation file path.');
+            return { ok: false, error: 'Save the document first.' };
+        }
+        const context = getRewriteContext(finding);
+        if (!context) return { ok: false, error: 'Finding is stale.' };
+
+        setStatus('Suggested fixes — asking AI for options…');
+        const result = await window.api.aiComplete({
+            kind: 'rewrite',
+            finding: { message: finding.message, severity: finding.severity },
+            snippet: context.snippet,
+            flagged: context.original
+        });
+        if (!result?.ok) {
+            setStatus(`Suggested fixes failed: ${result?.error || 'unknown error'}`);
+            return { ok: false, error: result?.error || 'unknown error' };
+        }
+
+        const options = extractRewriteOptions(result.content, 3);
+        if (options.length === 0) {
+            setStatus('Suggested fixes: AI returned no usable options.');
+            return { ok: false, error: 'No usable suggestions returned.' };
+        }
+
+        setStatus('Suggested fixes ready.');
+        return { ok: true, options };
+    };
+
+    const handleApplySuggestedFix = async (finding, suggestion) => {
+        if (!activeTab?.path) {
+            setStatus('Save the document first — Fix now needs a sibling annotation file path.');
+            return;
+        }
+        const context = getRewriteContext(finding);
+        if (!context) return;
+
+        await applyRewriteReplacement(
+            finding,
+            context,
+            suggestion,
+            `Replaced "${context.original}" with "${suggestion}" via Suggested fixes.`
+        );
+    };
+
     // Fix now: call AI rewrite, extract the first suggestion, replace the
     // flagged range in the editor, and ALSO log the before/after pair to
     // the annotation file so there's a durable record of what changed.
@@ -743,34 +824,15 @@ function App() {
             setStatus('Save the document first — Fix now needs a sibling annotation file path.');
             return;
         }
-        const plain = editorRef.current?.getPlainText?.() || content;
-        const original = plain.slice(finding.start, finding.end);
-
-        // Staleness guard: if the finding carries its expected flagged text
-        // and the text at those offsets no longer matches, the document has
-        // been edited since the scan and the offsets are wrong. Applying
-        // the replacement would corrupt the document ("LiLike" bug). Refuse
-        // the fix with a clear message.
-        if (finding.text && original !== finding.text) {
-            setStatus(
-                `Finding is stale — the document has changed since the scan. ` +
-                `Expected "${finding.text}" but offsets now point to "${original}". ` +
-                `Re-run the AI scan to refresh findings.`
-            );
-            return;
-        }
-        // Use the surrounding sentence as snippet context (50 chars either
-        // side is a cheap approximation; the AI prompt just needs context).
-        const snippetStart = Math.max(0, finding.start - 80);
-        const snippetEnd = Math.min(plain.length, finding.end + 80);
-        const snippet = plain.slice(snippetStart, snippetEnd);
+        const context = getRewriteContext(finding);
+        if (!context) return;
 
         setStatus('Fix now — asking AI for a rewrite…');
         const result = await window.api.aiComplete({
             kind: 'rewrite',
             finding: { message: finding.message, severity: finding.severity },
-            snippet,
-            flagged: original
+            snippet: context.snippet,
+            flagged: context.original
         });
         if (!result?.ok) {
             setStatus(`Fix now failed: ${result?.error || 'unknown error'}`);
@@ -783,32 +845,12 @@ function App() {
                 `AI returned no parseable rewrite. Raw response:\n\n${result.content}`));
             return;
         }
-        // Apply the replacement: drop-in substitute the flagged phrase
-        // with the AI's first alternative. The rewrite prompt now asks for
-        // phrase-level alternatives, so this is just the replacement text.
-        const before = plain.slice(0, finding.start);
-        const after = plain.slice(finding.end);
-        const newMarkdown = before + firstAlt + after;
-        updateContent(newMarkdown);
-
-        // Clear the fixed finding from the overlay so the user has visible
-        // confirmation that work was done — otherwise the squiggle stays
-        // on stale offsets and looks like nothing happened. AI findings
-        // after the replacement point need their offsets shifted by the
-        // length delta so they still highlight the right text.
-        const delta = firstAlt.length - original.length;
-        const nextAiIssues = aiIssues
-            .filter(i => !(i.start === finding.start && i.end === finding.end && i.source === finding.source))
-            .map(i => (i.start > finding.start)
-                ? { ...i, start: i.start + delta, end: i.end + delta }
-                : i);
-        setAiIssues(nextAiIssues);
-        // Pattern findings regenerate automatically on the next 300ms lint
-        // pass triggered by updateContent, so no explicit cleanup there.
-
-        await window.api.appendAnnotation(activeTab.path, buildFindingEntry(finding,
-            `Replaced "${original}" with "${firstAlt}" via Fix now.`));
-        setStatus(`Fix applied and logged. ${activeTab.path}.annotation.md`);
+        await applyRewriteReplacement(
+            finding,
+            context,
+            firstAlt,
+            `Replaced "${context.original}" with "${firstAlt}" via Fix now.`
+        );
     };
 
     // Refresh the file-tree node for a directory so newly-written sibling
@@ -1219,9 +1261,12 @@ function App() {
                             onToggleWrap={() => setWrap(w => !w)}
                             onFixLater={handleFixLater}
                             onFixNow={handleFixNow}
+                            onSuggestFixes={handleSuggestFixes}
+                            onApplySuggestedFix={handleApplySuggestedFix}
                             showLineNumbers={showLineNumbers}
                             editorFontSize={editorFontSize}
                             onChangeFontSize={setEditorFontSize}
+                            onContentReady={runLintNow}
                         />
                     )}
                 </main>
@@ -1336,6 +1381,46 @@ export function extractFirstRewrite(raw) {
     }
 
     return null;
+}
+
+export function extractRewriteOptions(raw, maxOptions = 3) {
+    if (!raw || typeof raw !== 'string') return [];
+    const cleaned = raw.replace(/^```[a-z]*\s*/i, '').replace(/\s*```\s*$/i, '').trim();
+    if (!cleaned) return [];
+
+    const options = [];
+    const numberedRegex = /^\s*\d+[.):]\s*(.+?)(?=\n\s*\d+[.):]|\n{2,}|$)/gms;
+    let match;
+    while ((match = numberedRegex.exec(cleaned)) && options.length < maxOptions) {
+        const text = match[1].trim().replace(/^["']+|["']+$/g, '');
+        if (text) options.push(text);
+    }
+    if (options.length > 0) return options;
+
+    const blocks = cleaned
+        .split(/\n{2,}/)
+        .map(b => b.trim())
+        .filter(Boolean)
+        .filter(b => !/^.{0,60}(alternatives?|rewrites?|options?|suggestions?)\s*:\s*$/i.test(b));
+    for (const block of blocks) {
+        if (options.length >= maxOptions) break;
+        const text = block.replace(/^["']+|["']+$/g, '');
+        if (text) options.push(text);
+    }
+    if (options.length > 0) return options;
+
+    const lines = cleaned
+        .split(/\n/)
+        .map(line => line.trim())
+        .filter(Boolean)
+        .filter(line => !/^.{0,60}(alternatives?|rewrites?|options?|suggestions?)\s*:\s*$/i.test(line));
+    for (const line of lines) {
+        if (options.length >= maxOptions) break;
+        const text = line.replace(/^["']+|["']+$/g, '');
+        if (text) options.push(text);
+    }
+
+    return options;
 }
 
 export default App;

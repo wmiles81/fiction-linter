@@ -96,6 +96,7 @@ function SettingsDialog({ settings, onCancel, onSave }) {
                     <p>Configure your SPE rules and AI connection details.</p>
                 </header>
 
+                <div className="modal-body">
                 <div className="modal-section">
                     <label htmlFor="spePath">SPE Rules Path</label>
                     <div className="inline-input-row">
@@ -201,6 +202,7 @@ function SettingsDialog({ settings, onCancel, onSave }) {
                     />
                 </div>
 
+                </div>{/* modal-body */}
                 <footer className="modal-actions">
                     <button className="ghost-button" onClick={onCancel}>Cancel</button>
                     <button className="primary-button" onClick={() => onSave(localSettings)}>

@@ -507,6 +507,7 @@ body {
      * lint warnings moved from a separate sidebar to inline hover tooltips
      * on the editor surface. */
     grid-template-rows: auto 1fr;
+    grid-template-columns: minmax(0, 1fr);
     gap: 16px;
     flex: 1;
     min-width: 0;
@@ -763,6 +764,15 @@ body {
     box-shadow: var(--shadow);
     animation: riseFade 0.3s ease;
     line-height: 1.2;
+    display: flex;
+    flex-direction: column;
+    max-height: calc(100vh - 48px);
+}
+
+.modal-body {
+    overflow-y: auto;
+    flex: 1 1 auto;
+    min-height: 0;
 }
 
 .modal-card h2 {
@@ -1258,6 +1268,7 @@ body {
 
 .editor-surface {
     flex: 1;
+    min-width: 0;
     min-height: 0;
     overflow-y: auto;
     overflow-x: hidden;
@@ -1284,6 +1295,7 @@ body {
 }
 
 .editor-surface.wrap {
+    white-space: normal;
     word-wrap: break-word;
     overflow-wrap: break-word;
 }
@@ -1320,6 +1332,7 @@ body {
     border-right: 1px solid var(--g-border, #d7d2c5);
     overflow: hidden;
     position: relative;
+    -webkit-user-select: none;
     user-select: none;
     pointer-events: none;
 }
@@ -1411,6 +1424,74 @@ body {
     margin-top: 8px;
     padding-top: 6px;
     border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.lint-tooltip-suggestions {
+    margin-top: 8px;
+    padding-top: 6px;
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.lint-tooltip-suggestions-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+}
+
+.lint-tooltip-link {
+    background: none;
+    border: none;
+    padding: 0;
+    color: #b9d0ff;
+    font: inherit;
+    font-size: 10px;
+    cursor: pointer;
+}
+
+.lint-tooltip-link:hover {
+    color: #d6e4ff;
+}
+
+.lint-tooltip-suggestions-status {
+    margin-top: 6px;
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.lint-tooltip-suggestions-status.error {
+    color: #f0b0b0;
+}
+
+.lint-tooltip-suggestions-list {
+    margin: 6px 0 0;
+    padding-left: 18px;
+    display: grid;
+    gap: 6px;
+}
+
+.lint-tooltip-suggestion-btn {
+    width: 100%;
+    text-align: left;
+    background: rgba(255, 255, 255, 0.08);
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    padding: 4px 8px;
+    border-radius: 4px;
+    font: inherit;
+    font-size: 11px;
+    cursor: pointer;
+}
+
+.lint-tooltip-suggestion-btn:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.16);
+}
+
+.lint-tooltip-suggestion-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
 }
 
 .lint-tooltip-btn {
