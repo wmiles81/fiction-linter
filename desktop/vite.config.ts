@@ -15,6 +15,9 @@ export default defineConfig({
         strictPort: true,
         fs: {
             allow: ['..']
+        },
+        watch: {
+            ignored: ['**/release/**', '**/dist/**']
         }
     },
     resolve: {

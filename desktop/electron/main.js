@@ -233,8 +233,21 @@ function createWindow() {
     const devServerUrl = process.env.VITE_DEV_SERVER_URL;
 
     if (isDev && devServerUrl) {
-        mainWindow.loadURL(devServerUrl);
         mainWindow.webContents.openDevTools({ mode: 'detach' });
+        (async () => {
+            for (let attempt = 1; attempt <= 25; attempt++) {
+                try {
+                    await mainWindow.loadURL(devServerUrl);
+                    return;
+                } catch (err) {
+                    if (err.code === 'ERR_CONNECTION_REFUSED' && attempt < 25) {
+                        await new Promise(resolve => setTimeout(resolve, 200));
+                    } else {
+                        console.error('[loadURL] failed after retries:', err);
+                    }
+                }
+            }
+        })();
     } else {
         mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
     }
@@ -246,8 +259,8 @@ app.whenReady().then(() => {
     createWindow();
     installMenu();
 
-    const { initAutoUpdater } = require('./updater');
     if (app.isPackaged) {
+        const { initAutoUpdater } = require('./updater');
         initAutoUpdater(mainWindow);
     }
 
@@ -684,6 +697,7 @@ ipcMain.handle('gdoc:auth', async () => {
 
         try {
             authWindow.loadURL('https://accounts.google.com/ServiceLogin?continue=https://docs.google.com');
+            authWindow.focus();
         } catch (err) {
             finish({ ok: false, error: `Failed to load sign-in URL: ${err.message}` });
         }
